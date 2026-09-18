@@ -21,6 +21,14 @@ export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, 
   const recipient = userRows[0];
   if (!recipient?.phone) return null;
 
+  const { rows: tenantRows } = await pool.query(
+    'SELECT whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id FROM tenants WHERE id = $1',
+    [tenantId]
+  );
+  const tenantCreds = tenantRows[0] || {};
+  const accessToken = tenantCreds.whatsapp_access_token || process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = tenantCreds.whatsapp_phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
   const template = WHATSAPP_TEMPLATES[eventType];
   if (!template) return null;
 
@@ -37,10 +45,10 @@ export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, 
   const message = { to: recipient.phone, templateName: template.name, params, text: template.render(params) };
 
   if (LIVE) {
-    const res = await fetch(`${GRAPH_API_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    const res = await fetch(`${GRAPH_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

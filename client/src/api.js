@@ -24,6 +24,9 @@ export const api = {
   updateUser: (id, data) => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   getTenants: () => request('/api/tenants'),
   createTenant: (data) => request('/api/tenants', { method: 'POST', body: JSON.stringify(data) }),
+  getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
+  updateWhatsAppSettings: (data) =>
+    request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
   switchTenant: (tenantId) => request('/api/auth/switch-tenant', { method: 'POST', body: JSON.stringify({ tenantId }) }),
   me: () => request('/api/auth/me'),
   logout: () => request('/api/auth/logout', { method: 'POST' }),

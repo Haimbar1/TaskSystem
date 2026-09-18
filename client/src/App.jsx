@@ -7,6 +7,7 @@ import TableView from './views/TableView.jsx';
 import KanbanStatusView from './views/KanbanStatusView.jsx';
 import KanbanAssigneeView from './views/KanbanAssigneeView.jsx';
 import UsersView from './views/UsersView.jsx';
+import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
 import WhatsAppPreviewModal from './components/WhatsAppPreviewModal.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
@@ -42,6 +43,10 @@ export default function App() {
             <Route
               path="/users"
               element={canManageUsers ? <UsersView /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/whatsapp-settings"
+              element={canManageUsers ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/signup"

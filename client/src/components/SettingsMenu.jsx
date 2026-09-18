@@ -56,6 +56,18 @@ export default function SettingsMenu({ user, canManageUsers }) {
             </button>
           )}
 
+          {canManageUsers && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate('/whatsapp-settings');
+              }}
+              className="w-full text-right px-2 py-1 rounded hover:bg-gray-100 text-sm"
+            >
+              הגדרות וואטסאפ
+            </button>
+          )}
+
           {user?.is_super_admin && (
             <>
               <button

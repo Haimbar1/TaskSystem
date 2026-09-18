@@ -1,11 +1,19 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { requireTenant } from '../middleware/tenant.js';
 
 const router = Router();
 
 function requireSuperAdmin(req, res, next) {
   if (!req.user.is_super_admin) return res.status(403).json({ error: 'Super admins only' });
+  next();
+}
+
+function requireTenantAdmin(req, res, next) {
+  if (req.user.role !== 'admin' && !req.user.is_super_admin) {
+    return res.status(403).json({ error: 'Admins only' });
+  }
   next();
 }
 
@@ -50,6 +58,42 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+// Tenant admin's own business's WhatsApp Business credentials — lets each
+// business send from its own number instead of sharing the WHATSAPP_* env
+// vars (see services/whatsapp.js, which falls back to those env vars when
+// these are unset). Access token is never sent back to the client in full.
+router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id FROM tenants WHERE id = $1',
+    [req.tenantId]
+  );
+  const t = rows[0] || {};
+  res.json({
+    whatsapp_access_token_set: !!t.whatsapp_access_token,
+    whatsapp_phone_number_id: t.whatsapp_phone_number_id || '',
+    whatsapp_waba_id: t.whatsapp_waba_id || '',
+  });
+});
+
+router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id } = req.body;
+  const { rows } = await pool.query(
+    `UPDATE tenants SET
+       whatsapp_access_token = COALESCE(NULLIF($1, ''), whatsapp_access_token),
+       whatsapp_phone_number_id = $2,
+       whatsapp_waba_id = $3
+     WHERE id = $4
+     RETURNING whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id`,
+    [whatsapp_access_token, whatsapp_phone_number_id || '', whatsapp_waba_id || '', req.tenantId]
+  );
+  const t = rows[0];
+  res.json({
+    whatsapp_access_token_set: !!t.whatsapp_access_token,
+    whatsapp_phone_number_id: t.whatsapp_phone_number_id || '',
+    whatsapp_waba_id: t.whatsapp_waba_id || '',
+  });
 });
 
 export default router;

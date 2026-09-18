@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { STATUS_LABELS } from '../constants.js';
+import { STATUS_LABELS, STATUS_COLORS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { showWhatsAppPreview } from '../whatsappPreview.js';
+import KanbanCard from '../components/KanbanCard.jsx';
 
 const STATUSES = Object.keys(STATUS_LABELS);
 
@@ -21,29 +22,37 @@ export default function KanbanStatusView() {
   }
 
   return (
-    <div className="grid grid-cols-5 gap-3">
-      {STATUSES.map((status) => (
-        <div
-          key={status}
-          className="bg-white border rounded-xl shadow-sm p-2 min-h-[300px]"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), status)}
-        >
-          <h3 className="font-semibold mb-2">{STATUS_LABELS[status]}</h3>
-          {tasks
-            .filter((t) => t.status === status)
-            .map((t) => (
-              <div
-                key={t.id}
-                draggable
-                onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
-                className="bg-gray-50 border rounded p-2 mb-2 cursor-move"
-              >
-                {t.title}
+    <div className="grid grid-cols-5 gap-3 items-start">
+      {STATUSES.map((status) => {
+        const colTasks = tasks.filter((t) => t.status === status);
+        const colors = STATUS_COLORS[status] || STATUS_COLORS.new;
+        return (
+          <div
+            key={status}
+            className="bg-white border rounded-xl shadow-sm overflow-hidden min-h-[300px]"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), status)}
+          >
+            <div className={`h-1 ${colors.bar}`} />
+            <div className="p-2">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h3 className="font-semibold text-sm text-gray-700">{STATUS_LABELS[status]}</h3>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.badge}`}>
+                  {colTasks.length}
+                </span>
               </div>
-            ))}
-        </div>
-      ))}
+              {colTasks.map((t) => (
+                <KanbanCard
+                  key={t.id}
+                  task={t}
+                  showAssignees
+                  onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -12,6 +12,11 @@ import { requireTenant } from './middleware/tenant.js';
 
 export const app = express();
 
+// Needed for secure cookies to work behind a platform's TLS-terminating
+// proxy (Railway/Render/etc.) — without it, express-session sees a plain
+// http request and refuses to set a `Secure` cookie at all.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 app.use(express.json());
 app.use(
@@ -19,6 +24,16 @@ app.use(
     secret: process.env.SESSION_SECRET || 'change-me',
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days — otherwise it's a session
+      // cookie that some browsers drop on their own schedule anyway.
+      // Client and server live on different domains in production, so the
+      // cookie must be SameSite=None (+ Secure, which None requires) or the
+      // browser silently refuses to send it back on the API fetch() calls —
+      // that's the "logged out on every refresh" symptom.
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    },
   })
 );
 app.use(passport.initialize());

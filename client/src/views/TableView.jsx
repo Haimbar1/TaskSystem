@@ -39,6 +39,10 @@ export default function TableView() {
     showWhatsAppPreview(updated.whatsappPreviews);
   }
 
+  function handleDeleted(taskId) {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+  }
+
   const columns = [
     ['title', 'המשימה'],
     ['priority', 'עדיפות'],
@@ -96,6 +100,7 @@ export default function TableView() {
           task={editingTask}
           onClose={() => setEditingTask(null)}
           onSaved={handleSaved}
+          onDeleted={handleDeleted}
         />
       )}
     </>

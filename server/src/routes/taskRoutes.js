@@ -185,4 +185,17 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  // task_assignees/task_watchers/task_activity_log/notifications/task_files
+  // all have ON DELETE CASCADE on task_id (see migrations/001_init.sql), so
+  // deleting the task row is enough.
+  const { rows } = await pool.query(
+    'DELETE FROM tasks WHERE id = $1 AND tenant_id = $2 RETURNING id',
+    [id, req.tenantId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.status(204).end();
+});
+
 export default router;

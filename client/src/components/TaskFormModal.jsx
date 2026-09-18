@@ -3,9 +3,10 @@ import { api } from '../api.js';
 import { PRIORITY_LABELS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 
-export default function TaskFormModal({ task, onClose, onSaved, onCreated }) {
+export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
   const [users, setUsers] = useState([]);
+  const [usersError, setUsersError] = useState('');
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
   const [priority, setPriority] = useState(task?.priority || 'normal');
@@ -13,9 +14,13 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated }) {
   const [assigneeIds, setAssigneeIds] = useState((task?.assignees || []).map((a) => a.id));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    api.getUsers().then(setUsers).catch(console.error);
+    api
+      .getUsers()
+      .then(setUsers)
+      .catch((err) => setUsersError(err.message));
   }, []);
 
   function toggleAssignee(id) {
@@ -46,6 +51,21 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated }) {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`למחוק את המשימה "${task.title}"? לא ניתן לשחזר.`)) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await api.deleteTask(task.id);
+      onDeleted?.(task.id);
+      onClose();
+    } catch (err) {
+      setError('שגיאה במחיקת המשימה');
+      console.error(err);
+      setDeleting(false);
     }
   }
 
@@ -101,33 +121,53 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated }) {
 
         <div>
           <label className="block text-sm mb-1">אחראים</label>
-          <div className="border rounded p-2 max-h-32 overflow-y-auto space-y-1">
-            {users.map((u) => (
-              <label key={u.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={assigneeIds.includes(u.id)}
-                  onChange={() => toggleAssignee(u.id)}
-                />
-                {u.name || u.email}
-              </label>
-            ))}
-          </div>
+          {usersError ? (
+            <p className="text-red-600 text-sm">שגיאה בטעינת רשימת המשתמשים: {usersError}</p>
+          ) : users.length === 0 ? (
+            <p className="text-gray-500 text-sm">אין עדיין משתמשים בעסק הזה. אפשר להוסיף במסך "משתמשים".</p>
+          ) : (
+            <div className="border rounded p-2 max-h-32 overflow-y-auto space-y-1">
+              {users.map((u) => (
+                <label key={u.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={assigneeIds.includes(u.id)}
+                    onChange={() => toggleAssignee(u.id)}
+                  />
+                  {u.name || u.email}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 rounded border">
-            ביטול
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-          >
-            {saving ? 'שומר…' : isEdit ? 'שמור' : 'צור משימה'}
-          </button>
+        <div className="flex justify-between items-center pt-2">
+          {isEdit ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-2 rounded border border-red-600 text-red-600 disabled:opacity-50"
+            >
+              {deleting ? 'מוחק…' : 'מחק משימה'}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="px-3 py-2 rounded border">
+              ביטול
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+            >
+              {saving ? 'שומר…' : isEdit ? 'שמור' : 'צור משימה'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

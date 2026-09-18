@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import passport from 'passport';
+import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 
 const router = Router();
@@ -19,6 +20,46 @@ router.get('/google/callback', (req, res, next) => {
       res.redirect(clientUrl);
     });
   })(req, res, next);
+});
+
+// Single Sign-On from the unified Portal (portal.smartesek.com): the portal already
+// verified this user's Google identity and their access to this module, and hands off
+// a short-lived signed token instead of making them go through the Google popup again
+// here. Purely additive — mirrors the exact same req.logIn(...) + redirect the regular
+// /google/callback route above already does, so the normal Google OAuth login is
+// completely untouched and still works on its own if this route is ever removed.
+router.get('/sso', async (req, res, next) => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const sharedSecret = process.env.SSO_SHARED_SECRET;
+  const { token } = req.query;
+
+  if (!sharedSecret) return res.redirect(`${clientUrl}?ssoError=not-configured`);
+  if (!token) return res.redirect(`${clientUrl}?ssoError=missing-token`);
+
+  let payload;
+  try {
+    payload = jwt.verify(token, sharedSecret);
+  } catch {
+    return res.redirect(`${clientUrl}?ssoError=invalid-token`);
+  }
+
+  const email = String(payload.email || '').toLowerCase().trim();
+  if (!email) return res.redirect(`${clientUrl}?ssoError=invalid-token`);
+
+  try {
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = rows[0];
+    // Same invite-only rule as the Google OAuth strategy: an admin must have
+    // already added this email as a user row before they can sign in.
+    if (!user) return res.redirect(`${clientUrl}?ssoError=not-invited`);
+
+    req.logIn(user, (err) => {
+      if (err) return next(err);
+      res.redirect(clientUrl);
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/logout', (req, res) => {

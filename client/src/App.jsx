@@ -12,11 +12,22 @@ import WhatsAppPreviewModal from './components/WhatsAppPreviewModal.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Single Sign-On from the unified Portal: a ?sso_token=... means the portal already
+    // verified this user and is handing off a short-lived token. The server (not this
+    // page) verifies it and sets the real session cookie, so just forward the whole
+    // browser there — it redirects back here once logged in.
+    const ssoToken = new URLSearchParams(window.location.search).get('sso_token');
+    if (ssoToken) {
+      window.location.href = `${API_URL}/api/auth/sso?token=${encodeURIComponent(ssoToken)}`;
+      return;
+    }
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null)).finally(() => setLoading(false));
   }, []);
 

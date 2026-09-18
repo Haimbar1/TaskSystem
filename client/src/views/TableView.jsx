@@ -6,6 +6,7 @@ import AssigneePicker from '../components/AssigneePicker.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 import { formatDate } from '../utils.js';
 import { showWhatsAppPreview } from '../whatsappPreview.js';
+import PageFrame from '../components/PageFrame.jsx';
 
 // TODO: per-column filtering (the spec asks for sort + filter on every
 // column) — only sorting is wired up so far.
@@ -55,7 +56,8 @@ export default function TableView() {
 
   return (
     <>
-      <table className="w-full bg-white border rounded-xl shadow-sm overflow-hidden">
+      <PageFrame title="כל המשימות" subtitle={`${tasks.length} משימות`}>
+      <table className="w-full">
         <thead>
           <tr>
             {columns.map(([key, label]) => (
@@ -94,6 +96,7 @@ export default function TableView() {
           ))}
         </tbody>
       </table>
+      </PageFrame>
 
       {editingTask && (
         <TaskFormModal

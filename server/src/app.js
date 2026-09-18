@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
+import pgSession from 'connect-pg-simple';
+import { pool } from './db.js';
 import passport from './auth/googleStrategy.js';
 import authRoutes from './routes/authRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
@@ -19,8 +21,15 @@ app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 app.use(express.json());
+const PgSessionStore = pgSession(session);
+
 app.use(
   session({
+    // Deployed as Vercel serverless functions — no in-memory state survives
+    // between invocations, so sessions must live in Postgres instead of the
+    // default MemoryStore (which only worked for the single long-running
+    // dev/Railway process).
+    store: new PgSessionStore({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
     secret: process.env.SESSION_SECRET || 'change-me',
     resave: false,
     saveUninitialized: false,

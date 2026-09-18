@@ -28,14 +28,8 @@ export default function App() {
   return (
     <AppProvider user={user}>
       <div dir="rtl" className="min-h-screen bg-gray-50">
-        <header className="p-4 border-b bg-white flex items-center justify-between">
-          <h1 className="text-xl font-bold">מערכת ניהול משימות</h1>
-          {user.activeTenantName && (
-            <span className="text-sm text-gray-500">עסק: {user.activeTenantName}</span>
-          )}
-        </header>
         <Nav />
-        <main className="p-4">
+        <main className="p-4 max-w-7xl mx-auto">
           <Routes>
             <Route path="/" element={<TableView />} />
             <Route path="/kanban/status" element={<KanbanStatusView />} />

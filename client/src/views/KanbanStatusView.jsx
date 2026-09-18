@@ -25,7 +25,7 @@ export default function KanbanStatusView() {
       {STATUSES.map((status) => (
         <div
           key={status}
-          className="bg-white border rounded p-2 min-h-[300px]"
+          className="bg-white border rounded-xl shadow-sm p-2 min-h-[300px]"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), status)}
         >

@@ -47,7 +47,7 @@ export default function UsersView() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border rounded p-4">
+      <div className="bg-white border rounded-xl shadow-sm p-4">
         <h2 className="font-semibold mb-3">הוספת משתמש</h2>
         <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
           <div>
@@ -84,7 +84,7 @@ export default function UsersView() {
           <button
             type="submit"
             disabled={saving}
-            className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+            className="px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50"
           >
             {saving ? 'מוסיף…' : 'הוסף משתמש'}
           </button>
@@ -96,7 +96,7 @@ export default function UsersView() {
         </p>
       </div>
 
-      <table className="w-full bg-white border rounded">
+      <table className="w-full bg-white border rounded-xl shadow-sm overflow-hidden">
         <thead>
           <tr>
             <th className="p-2 border-b text-right">שם</th>
@@ -118,7 +118,7 @@ export default function UsersView() {
               <td className="p-2">
                 <button
                   onClick={() => setEditingUser(u)}
-                  className="text-blue-700 hover:underline text-sm"
+                  className="text-emerald-700 hover:underline text-sm"
                 >
                   ערוך
                 </button>

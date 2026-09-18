@@ -38,19 +38,19 @@ export default function SettingsMenu({ user, canManageUsers }) {
       <button
         onClick={() => setOpen((o) => !o)}
         title="הגדרות"
-        className="w-9 h-9 flex items-center justify-center rounded border bg-white text-lg"
+        className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg transition-colors"
       >
         ⚙️
       </button>
       {open && (
-        <div className="absolute left-0 mt-1 bg-white border rounded shadow p-2 min-w-[220px] z-20 space-y-2">
+        <div className="absolute left-0 mt-2 bg-white border rounded-xl shadow-lg p-2 min-w-[220px] z-20 space-y-1 text-gray-900">
           {canManageUsers && (
             <button
               onClick={() => {
                 setOpen(false);
                 navigate('/users');
               }}
-              className="w-full text-right px-2 py-1 rounded hover:bg-gray-100 text-sm"
+              className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
             >
               משתמשים
             </button>
@@ -62,7 +62,7 @@ export default function SettingsMenu({ user, canManageUsers }) {
                 setOpen(false);
                 navigate('/whatsapp-settings');
               }}
-              className="w-full text-right px-2 py-1 rounded hover:bg-gray-100 text-sm"
+              className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
             >
               הגדרות וואטסאפ
             </button>
@@ -75,7 +75,7 @@ export default function SettingsMenu({ user, canManageUsers }) {
                   setOpen(false);
                   navigate('/signup');
                 }}
-                className="w-full text-right px-2 py-1 rounded hover:bg-gray-100 text-sm"
+                className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
               >
                 עסק חדש
               </button>

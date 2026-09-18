@@ -32,7 +32,7 @@ export default function WhatsAppPreviewModal() {
           </div>
         ))}
         <div className="flex justify-end">
-          <button onClick={() => setPreviews(null)} className="px-3 py-2 rounded bg-blue-600 text-white">
+          <button onClick={() => setPreviews(null)} className="px-3 py-2 rounded-lg bg-emerald-600 text-white">
             סגור
           </button>
         </div>

@@ -55,7 +55,7 @@ export default function TableView() {
 
   return (
     <>
-      <table className="w-full bg-white border rounded">
+      <table className="w-full bg-white border rounded-xl shadow-sm overflow-hidden">
         <thead>
           <tr>
             {columns.map(([key, label]) => (
@@ -73,7 +73,7 @@ export default function TableView() {
           {tasks.map((t) => (
             <tr key={t.id} className="border-b">
               <td
-                className="p-2 cursor-pointer text-blue-700 hover:underline"
+                className="p-2 cursor-pointer text-emerald-700 hover:underline"
                 onClick={() => setEditingTask(t)}
               >
                 {t.title}

@@ -37,16 +37,16 @@ export default function CreateBusiness() {
 
   if (created) {
     return (
-      <div className="max-w-sm mx-auto bg-white border rounded p-6 text-center space-y-4">
+      <div className="max-w-sm mx-auto bg-white border rounded-xl shadow-sm p-6 text-center space-y-4">
         <h2 className="text-lg font-bold">העסק "{created.name}" נוצר בהצלחה!</h2>
         <p className="text-gray-600 text-sm">
           המשתמש שהזנת יוכל להתחבר עם Google. אפשר גם לעבור לצפות בעסק הזה עכשיו.
         </p>
         <div className="flex justify-center gap-2">
-          <button onClick={switchToNewTenant} className="px-3 py-2 rounded bg-blue-600 text-white">
+          <button onClick={switchToNewTenant} className="px-3 py-2 rounded-lg bg-emerald-600 text-white">
             עבור לעסק הזה
           </button>
-          <button onClick={() => setCreated(null)} className="px-3 py-2 rounded border">
+          <button onClick={() => setCreated(null)} className="px-3 py-2 rounded-lg border">
             צור עסק נוסף
           </button>
         </div>
@@ -55,7 +55,7 @@ export default function CreateBusiness() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm mx-auto bg-white border rounded p-6 space-y-3">
+    <form onSubmit={handleSubmit} className="max-w-sm mx-auto bg-white border rounded-xl shadow-sm p-6 space-y-3">
       <h1 className="text-lg font-bold mb-2">יצירת עסק חדש</h1>
 
       <div>
@@ -93,13 +93,13 @@ export default function CreateBusiness() {
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => navigate('/')} className="px-3 py-2 rounded border">
+        <button type="button" onClick={() => navigate('/')} className="px-3 py-2 rounded-lg border">
           ביטול
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+          className="px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50"
         >
           {saving ? 'יוצר…' : 'צור עסק'}
         </button>

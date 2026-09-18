@@ -149,7 +149,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="px-3 py-2 rounded border border-red-600 text-red-600 disabled:opacity-50"
+              className="px-3 py-2 rounded-lg border border-red-600 text-red-600 disabled:opacity-50"
             >
               {deleting ? 'מוחק…' : 'מחק משימה'}
             </button>
@@ -157,13 +157,13 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             <span />
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded border">
+            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg border">
               ביטול
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+              className="px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50"
             >
               {saving ? 'שומר…' : isEdit ? 'שמור' : 'צור משימה'}
             </button>

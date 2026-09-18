@@ -45,7 +45,7 @@ export default function WhatsAppSettingsView() {
   }
 
   return (
-    <div className="bg-white border rounded p-4 max-w-lg">
+    <div className="bg-white border rounded-xl shadow-sm p-4 max-w-lg">
       <h2 className="font-semibold mb-3">הגדרות וואטסאפ לעסק</h2>
       <p className="text-gray-500 text-sm mb-3">
         המזהים האלה שייכים לעסק הנוכחי בלבד. אם לא ימולאו, המערכת תשתמש
@@ -83,7 +83,7 @@ export default function WhatsAppSettingsView() {
         <button
           type="submit"
           disabled={saving}
-          className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+          className="px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-50"
         >
           {saving ? 'שומר…' : 'שמור'}
         </button>

@@ -29,7 +29,7 @@ export default function KanbanAssigneeView() {
       {columns.map((col) => (
         <div
           key={col.id}
-          className="bg-white border rounded p-2 min-h-[300px]"
+          className="bg-white border rounded-xl shadow-sm p-2 min-h-[300px]"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), col.id)}
         >

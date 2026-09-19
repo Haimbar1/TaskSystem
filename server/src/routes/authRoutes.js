@@ -62,6 +62,51 @@ router.get('/sso', async (req, res, next) => {
   }
 });
 
+// In-app "switch to another module" widget: proxies to the portal's server-to-server
+// SSO endpoints (portal is the source of truth for who can open what). The email comes
+// from the real session, never from the request.
+const PORTAL_URL = process.env.PORTAL_URL || 'https://portal.smartesek.com';
+const THIS_MODULE_KEY = 'TASKS';
+
+async function callPortal(path, email, extra = {}) {
+  const callerToken = jwt.sign({ email }, process.env.SSO_SHARED_SECRET, { expiresIn: '30s' });
+  const portalRes = await fetch(`${PORTAL_URL}/api/sso/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: callerToken, ...extra }),
+  });
+  return { ok: portalRes.ok, status: portalRes.status, data: await portalRes.json() };
+}
+
+router.get('/switcher/modules', async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!process.env.SSO_SHARED_SECRET) return res.status(500).json({ error: 'sso-not-configured' });
+  try {
+    const { ok, status, data } = await callPortal('modules', req.user.email.toLowerCase());
+    if (!ok) return res.status(status).json(data);
+    res.json({
+      modules: (data.modules || []).filter((m) => String(m.key).toUpperCase() !== THIS_MODULE_KEY),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/switcher/token', async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!process.env.SSO_SHARED_SECRET) return res.status(500).json({ error: 'sso-not-configured' });
+  const { moduleKey } = req.body || {};
+  if (!moduleKey) return res.status(400).json({ error: 'missing-module-key' });
+  try {
+    const { ok, status, data } = await callPortal('token-for', req.user.email.toLowerCase(), { moduleKey });
+    if (!ok) return res.status(status).json(data);
+    const sep = data.baseUrl.includes('?') ? '&' : '?';
+    res.json({ redirectUrl: `${data.baseUrl}${sep}sso_token=${encodeURIComponent(data.ssoToken)}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/logout', (req, res) => {
   req.logout(() => res.json({ ok: true }));
 });

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext.jsx';
 import { api } from '../api.js';
 import TaskFormModal from './TaskFormModal.jsx';
 import SettingsMenu from './SettingsMenu.jsx';
+import AppSwitcher from './AppSwitcher.jsx';
 import { showWhatsAppPreview } from '../whatsappPreview.js';
 
 export default function Nav() {
@@ -26,6 +27,7 @@ export default function Nav() {
       <nav className="bg-gradient-to-l from-teal-950 to-teal-900 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            <AppSwitcher />
             <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold">
               מ
             </div>

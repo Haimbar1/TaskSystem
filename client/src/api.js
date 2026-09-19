@@ -29,5 +29,8 @@ export const api = {
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
   switchTenant: (tenantId) => request('/api/auth/switch-tenant', { method: 'POST', body: JSON.stringify({ tenantId }) }),
   me: () => request('/api/auth/me'),
+  getSwitcherModules: () => request('/api/auth/switcher/modules'),
+  getSwitcherToken: (moduleKey) =>
+    request('/api/auth/switcher/token', { method: 'POST', body: JSON.stringify({ moduleKey }) }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 };

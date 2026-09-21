@@ -2,6 +2,7 @@ import { Router } from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
+import { provisionFromPortal } from '../portalProvision.js';
 
 const router = Router();
 
@@ -47,14 +48,23 @@ router.get('/sso', async (req, res, next) => {
   if (!email) return res.redirect(`${clientUrl}?ssoError=invalid-token`);
 
   try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    const user = rows[0];
-    // Same invite-only rule as the Google OAuth strategy: an admin must have
-    // already added this email as a user row before they can sign in.
-    if (!user) return res.redirect(`${clientUrl}?ssoError=not-invited`);
+    // New portal tokens say which business the person is entering and their role in it; the
+    // matching tenant/user is created or linked here (portal is where members are managed).
+    // Older tokens without that info fall through to the invite-only lookup below.
+    const provisioned = await provisionFromPortal({ ...payload, email });
+    let user = provisioned?.user;
+    if (!user) {
+      const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      user = rows[0];
+      // Same invite-only rule as the Google OAuth strategy: an admin must have
+      // already added this email as a user row before they can sign in.
+      if (!user) return res.redirect(`${clientUrl}?ssoError=not-invited`);
+    }
 
     req.logIn(user, (err) => {
       if (err) return next(err);
+      // A super admin lands in the business they chose in the portal.
+      if (provisioned && user.is_super_admin) req.session.activeTenantId = provisioned.tenantId;
       res.redirect(clientUrl);
     });
   } catch (err) {

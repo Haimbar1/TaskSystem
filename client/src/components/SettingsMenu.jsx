@@ -64,17 +64,10 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
             </a>
           )}
 
+          {/* Users and new businesses are managed in the portal (link above), not here. */}
           {hasAppItems && <div className={sectionClass}>הגדרות האפליקציה</div>}
-          {canManageUsers && (
-            <button onClick={() => go('/users')} className={itemClass}>
-              משתמשים
-            </button>
-          )}
           {user?.is_super_admin && (
             <>
-              <button onClick={() => go('/signup')} className={itemClass}>
-                עסק חדש
-              </button>
               <div className="px-2.5 pt-1">
                 <label className="block text-xs text-gray-500 mb-1">מעבר בין עסקים</label>
                 <select

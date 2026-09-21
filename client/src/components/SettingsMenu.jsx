@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 
-// Everything here is admin-ish, low-frequency stuff (switch business, create
-// a business, manage users) — tucked behind a gear icon so it doesn't
-// compete with the day-to-day nav (table/kanban).
-export default function SettingsMenu({ user, canManageUsers }) {
+const PORTAL_URL = 'https://portal.smartesek.com';
+
+// The same gear, in the same place (right after the app switcher), with the same menu layout in
+// every SmartEsek app: portal admin link, app settings, WhatsApp/integrations, log out.
+export default function SettingsMenu({ user, canManageUsers, onLogout }) {
   const [open, setOpen] = useState(false);
   const [tenants, setTenants] = useState([]);
   const ref = useRef(null);
@@ -31,56 +32,50 @@ export default function SettingsMenu({ user, canManageUsers }) {
     window.location.href = '/';
   }
 
-  if (!canManageUsers && !user?.is_super_admin) return null;
+  const go = (path) => {
+    setOpen(false);
+    navigate(path);
+  };
+  const itemClass = 'w-full text-right px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-sm';
+  const sectionClass = 'px-2.5 pt-2 pb-0.5 text-[10px] font-bold text-gray-400';
+  const hasAppItems = canManageUsers || user?.is_super_admin;
 
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         title="הגדרות"
-        className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg transition-colors"
+        className="p-2 rounded-lg text-teal-50 hover:bg-white/10 transition-colors text-lg leading-none"
       >
         ⚙️
       </button>
       {open && (
-        <div className="absolute left-0 mt-2 bg-white border rounded-xl shadow-lg p-2 min-w-[220px] z-20 space-y-1 text-gray-900">
+        <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-40 text-gray-900">
           {canManageUsers && (
-            <button
-              onClick={() => {
-                setOpen(false);
-                navigate('/users');
-              }}
-              className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
+            <a
+              href={PORTAL_URL}
+              target="_blank"
+              rel="noopener"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-between px-2.5 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-sm font-bold text-blue-800"
             >
+              <span>ניהול עסק ומשתמשים</span>
+              <span>↗</span>
+            </a>
+          )}
+
+          {hasAppItems && <div className={sectionClass}>הגדרות האפליקציה</div>}
+          {canManageUsers && (
+            <button onClick={() => go('/users')} className={itemClass}>
               משתמשים
             </button>
           )}
-
-          {canManageUsers && (
-            <button
-              onClick={() => {
-                setOpen(false);
-                navigate('/whatsapp-settings');
-              }}
-              className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
-            >
-              הגדרות וואטסאפ
-            </button>
-          )}
-
           {user?.is_super_admin && (
             <>
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  navigate('/signup');
-                }}
-                className="w-full text-right px-2 py-1 rounded-lg hover:bg-gray-100 text-sm"
-              >
+              <button onClick={() => go('/signup')} className={itemClass}>
                 עסק חדש
               </button>
-
-              <div className="px-2 pt-1 border-t">
+              <div className="px-2.5 pt-1">
                 <label className="block text-xs text-gray-500 mb-1">מעבר בין עסקים</label>
                 <select
                   value={user.activeTenantId || ''}
@@ -96,6 +91,27 @@ export default function SettingsMenu({ user, canManageUsers }) {
               </div>
             </>
           )}
+
+          {canManageUsers && (
+            <>
+              <div className={sectionClass}>וואטסאפ ואינטגרציות</div>
+              <button onClick={() => go('/whatsapp-settings')} className={itemClass}>
+                הגדרות וואטסאפ
+              </button>
+            </>
+          )}
+
+          <div className="border-t border-gray-100 mt-1.5 pt-1">
+            <button
+              onClick={() => {
+                setOpen(false);
+                onLogout();
+              }}
+              className={itemClass}
+            >
+              התנתקות
+            </button>
+          </div>
         </div>
       )}
     </div>

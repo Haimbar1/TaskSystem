@@ -22,7 +22,9 @@ export const api = {
   getUsers: () => request('/api/users'),
   inviteUser: (data) => request('/api/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  getTenants: () => request('/api/tenants'),
+  getSwitcherTenants: () => request('/api/auth/switcher/tenants'),
+  getSwitchTenantToken: (portalTenantId) =>
+    request('/api/auth/switcher/tenant', { method: 'POST', body: JSON.stringify({ portalTenantId }) }),
   createTenant: (data) => request('/api/tenants', { method: 'POST', body: JSON.stringify(data) }),
   getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
   updateWhatsAppSettings: (data) =>

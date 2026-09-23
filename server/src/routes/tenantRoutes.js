@@ -18,13 +18,6 @@ function requireTenantAdmin(req, res, next) {
   next();
 }
 
-// Lists every business — used to populate the tenant switcher and the
-// "which business does this new user belong to" picker.
-router.get('/', requireAuth, requireSuperAdmin, async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name FROM tenants ORDER BY name');
-  res.json(rows);
-});
-
 // Creates a brand-new business plus its first admin user, who can then sign
 // in with Google (googleStrategy.js matches them by email once this row
 // exists). Super-admin only — regular tenant admins manage their own

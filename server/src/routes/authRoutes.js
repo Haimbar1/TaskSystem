@@ -134,6 +134,44 @@ router.post('/switcher/token', async (req, res, next) => {
   }
 });
 
+// In-app "switch business" list for a super admin: the businesses come from the portal (where
+// they're managed), not from this app's local tenants table, which only has the ones someone
+// has already entered through the portal (plus pre-portal leftovers).
+router.get('/switcher/tenants', async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!req.user.is_super_admin) return res.status(403).json({ error: 'Super admins only' });
+  if (!process.env.SSO_SHARED_SECRET) return res.status(500).json({ error: 'sso-not-configured' });
+  try {
+    const { ok, status, data } = await callPortal('tenants', req.user.email.toLowerCase(), {
+      moduleKey: THIS_MODULE_KEY,
+    });
+    if (!ok) return res.status(status).json(data);
+    res.json({ tenants: data.tenants || [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Switching to one of those businesses is a regular portal SSO login into it (the portal re-checks
+// access), so a business that doesn't exist here yet gets created and linked by /sso like any other.
+router.post('/switcher/tenant', async (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!req.user.is_super_admin) return res.status(403).json({ error: 'Super admins only' });
+  if (!process.env.SSO_SHARED_SECRET) return res.status(500).json({ error: 'sso-not-configured' });
+  const portalTenantId = Number(req.body?.portalTenantId);
+  if (!portalTenantId) return res.status(400).json({ error: 'missing-tenant' });
+  try {
+    const { ok, status, data } = await callPortal('token-for', req.user.email.toLowerCase(), {
+      moduleKey: THIS_MODULE_KEY,
+      tenantId: portalTenantId,
+    });
+    if (!ok) return res.status(status).json(data);
+    res.json({ ssoToken: data.ssoToken });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/logout', (req, res) => {
   req.logout(() => res.json({ ok: true }));
 });
@@ -145,13 +183,15 @@ router.get('/me', async (req, res) => {
     req.user.is_super_admin && req.session.activeTenantId
       ? req.session.activeTenantId
       : req.user.tenant_id;
-  const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [activeTenantId]);
+  // SELECT * so this still works where portal_tenant_id hasn't been added yet (portalProvision.js).
+  const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [activeTenantId]);
 
   res.json({
     user: {
       ...req.user,
       activeTenantId,
       activeTenantName: rows[0]?.name || null,
+      activePortalTenantId: rows[0]?.portal_tenant_id ?? null,
       is_embed: isEmbedUser(req.user),
       // Super admins manage the users of embedded businesses here (their people never log in
       // through the portal, which is where users are managed otherwise).

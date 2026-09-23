@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 
 const PORTAL_URL = 'https://portal.smartesek.com';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 // The same gear, in the same place (right after the app switcher), with the same menu layout in
 // every SmartEsek app: portal admin link, app settings, WhatsApp/integrations, log out.
@@ -20,16 +21,26 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
     return () => document.removeEventListener('mousedown', onOutside);
   }, []);
 
+  // The list comes from the portal (where businesses are managed); see /switcher/tenants.
   useEffect(() => {
     if (open && user?.is_super_admin) {
-      api.getTenants().then(setTenants).catch(console.error);
+      api
+        .getSwitcherTenants()
+        .then((r) => setTenants(r.tenants))
+        .catch(console.error);
     }
   }, [open, user?.is_super_admin]);
 
-  async function switchTenant(tenantId) {
-    if (tenantId === user.activeTenantId) return;
-    await api.switchTenant(tenantId);
-    window.location.href = '/';
+  // Switching is a portal SSO login into the chosen business (creates it here if it's new).
+  async function switchTenant(portalTenantId) {
+    if (!portalTenantId || Number(portalTenantId) === user.activePortalTenantId) return;
+    try {
+      const { ssoToken } = await api.getSwitchTenantToken(Number(portalTenantId));
+      window.location.href = `${API_URL}/api/auth/sso?token=${encodeURIComponent(ssoToken)}`;
+    } catch (err) {
+      console.error(err);
+      window.alert('לא ניתן לעבור לעסק הזה');
+    }
   }
 
   const go = (path) => {
@@ -71,10 +82,14 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
               <div className="px-2.5 pt-1">
                 <label className="block text-xs text-gray-500 mb-1">מעבר בין עסקים</label>
                 <select
-                  value={user.activeTenantId || ''}
+                  value={user.activePortalTenantId ?? ''}
                   onChange={(e) => switchTenant(e.target.value)}
                   className="w-full border rounded px-2 py-1 text-sm bg-white"
                 >
+                  {/* Current business isn't linked to the portal (pre-portal leftover). */}
+                  {user.activePortalTenantId == null && (
+                    <option value="">{user.activeTenantName || 'עסק נוכחי'} (לא מקושר לפורטל)</option>
+                  )}
                   {tenants.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { EMBED_USER_EMAIL, getEmbedToken } from '../embed.js';
+import { EMBED_USER_EMAIL, getEmbedToken, ensureOptionalUserEmail } from '../embed.js';
 
 const router = Router();
 
@@ -17,24 +17,28 @@ async function requireEmbedUserAdmin(req, res, next) {
 // The embed service user (see embed.js) isn't a person, so it's never listed or assignable.
 router.get('/', async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT id, name, email, phone, role FROM users WHERE tenant_id = $1 AND email <> $2',
+    'SELECT id, name, email, phone, role FROM users WHERE tenant_id = $1 AND email IS DISTINCT FROM $2',
     [req.tenantId, EMBED_USER_EMAIL]
   );
   res.json(rows);
 });
 
-// Pre-creates a user row (see requireEmbedUserAdmin for who may).
+// Creates a user row (see requireEmbedUserAdmin for who may). These people don't log in, so
+// email is optional; name is required instead (it's how they're shown everywhere).
 // Phone is required — it's the only way notifications.js/whatsapp.js can
 // reach this person, since WhatsApp sends are silently skipped without one.
 router.post('/invite', requireEmbedUserAdmin, async (req, res) => {
   // req.tenantId already reflects whichever business a super admin has
   // switched to (see middleware/tenant.js) — so this always creates the
   // user in that business, no separate "which tenant" field needed.
-  const { email, name, phone } = req.body;
-  if (!email || !phone) {
-    return res.status(400).json({ error: 'email and phone are required' });
+  const name = String(req.body.name || '').trim();
+  const phone = String(req.body.phone || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase() || null;
+  if (!name || !phone) {
+    return res.status(400).json({ error: 'name and phone are required' });
   }
   try {
+    await ensureOptionalUserEmail();
     const { rows } = await pool.query(
       `INSERT INTO users (tenant_id, email, name, phone, role)
        VALUES ($1, $2, $3, $4, 'member') RETURNING id, name, email, phone, role`,

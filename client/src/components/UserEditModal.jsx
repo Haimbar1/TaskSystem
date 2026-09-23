@@ -35,7 +35,7 @@ export default function UserEditModal({ user, onClose, onSaved }) {
 
         <div>
           <label className="block text-sm mb-1">מייל</label>
-          <input className="w-full border rounded p-2 bg-gray-100 text-gray-500" value={user.email} disabled />
+          <input className="w-full border rounded p-2 bg-gray-100 text-gray-500" value={user.email || ''} disabled />
         </div>
 
         <div>

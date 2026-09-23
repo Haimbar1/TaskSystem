@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
   let creatorId = req.user.id;
   if (isEmbedUser(req.user)) {
     const { rows } = await pool.query(
-      'SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND email <> $3',
+      'SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND email IS DISTINCT FROM $3',
       [req.body.created_by || null, req.tenantId, EMBED_USER_EMAIL]
     );
     if (!rows[0]) return res.status(400).json({ error: 'created_by is required' });

@@ -24,6 +24,16 @@ async function ensureColumn() {
   columnReady = true;
 }
 
+// People of an embedded business are added by a super admin and never log in, so email is
+// optional for them (see routes/userRoutes.js). Queries that exclude the service user by email
+// must therefore use IS DISTINCT FROM, not <>, or they'd drop these users too.
+let nullableEmailReady = false;
+export async function ensureOptionalUserEmail() {
+  if (nullableEmailReady) return;
+  await pool.query('ALTER TABLE users ALTER COLUMN email DROP NOT NULL');
+  nullableEmailReady = true;
+}
+
 // Returns the business's service user for a valid token, creating it on first use; null otherwise.
 export async function userForEmbedToken(token) {
   if (!token) return null;

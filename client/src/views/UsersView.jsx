@@ -21,8 +21,8 @@ export default function UsersView() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!email.trim() || !phone.trim()) {
-      setError('חובה להזין מייל וטלפון (הטלפון משמש לשליחת נוטיפיקציות בוואטסאפ)');
+    if (!name.trim() || !phone.trim()) {
+      setError('חובה להזין שם וטלפון (הטלפון משמש לשליחת נוטיפיקציות בוואטסאפ)');
       return;
     }
     setSaving(true);
@@ -51,7 +51,9 @@ export default function UsersView() {
         <h2 className="font-semibold mb-3">הוספת משתמש</h2>
         <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
           <div>
-            <label className="block text-sm mb-1">שם</label>
+            <label className="block text-sm mb-1">
+              שם <span className="text-red-600">*</span>
+            </label>
             <input
               className="border rounded p-2"
               value={name}
@@ -60,7 +62,7 @@ export default function UsersView() {
           </div>
           <div>
             <label className="block text-sm mb-1">
-              מייל <span className="text-red-600">*</span>
+              מייל <span className="text-gray-400">(לא חובה)</span>
             </label>
             <input
               type="email"
@@ -91,8 +93,8 @@ export default function UsersView() {
         </form>
         {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
         <p className="text-gray-500 text-sm mt-2">
-          המשתמש יוכל להתחבר עם Google לאחר שהוזמן. הטלפון חובה כדי שיוכל לקבל
-          התראות בוואטסאפ.
+          משתמשי העסק נכנסים דרך Monday ולא מתחברים בעצמם, לכן מייל לא חובה. הטלפון
+          חובה כדי שיוכלו לקבל התראות בוואטסאפ.
         </p>
       </div>
 

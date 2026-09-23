@@ -78,10 +78,13 @@ router.get('/sso', async (req, res, next) => {
 router.get('/embed', async (req, res, next) => {
   const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   try {
-    const user = await userForEmbedToken(String(req.query.token || ''));
+    const token = String(req.query.token || '');
+    const user = await userForEmbedToken(token);
     if (!user) return res.redirect(`${clientUrl}?embedError=invalid-token`);
     req.logIn(user, (err) => {
       if (err) return next(err);
+      // Checked on every request by dropStaleEmbedSession (embed.js).
+      req.session.embedToken = token;
       res.redirect(clientUrl);
     });
   } catch (err) {

@@ -63,6 +63,20 @@ export async function clearEmbedToken(tenantId) {
   await pool.query('UPDATE tenants SET embed_token = NULL WHERE id = $1', [tenantId]);
 }
 
+// Runs on every request after passport.session(): an embed login is only as good as the token it
+// came in with (kept in the session by /api/auth/embed). Once that token is replaced or turned
+// off, the session is logged out, so the old link stops working for people already inside too.
+export async function dropStaleEmbedSession(req, res, next) {
+  if (!isEmbedUser(req.user)) return next();
+  try {
+    const current = await getEmbedToken(req.user.tenant_id);
+    if (current && current === req.session.embedToken) return next();
+    req.logout((err) => next(err));
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Sets a new token for the business (the old one stops working immediately).
 export async function rotateEmbedToken(tenantId) {
   await ensureColumn();

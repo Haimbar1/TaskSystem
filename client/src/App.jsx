@@ -55,7 +55,9 @@ export default function App() {
             <Route path="/kanban/assignee" element={<KanbanAssigneeView />} />
             <Route
               path="/users"
-              element={user.activeTenantHasEmbed ? <UsersView /> : <Navigate to="/" replace />}
+              element={
+                user.activeTenantHasEmbed || user.is_embed ? <UsersView /> : <Navigate to="/" replace />
+              }
             />
             <Route
               path="/whatsapp-settings"

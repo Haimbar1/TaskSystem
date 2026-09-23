@@ -68,6 +68,12 @@ export default function Nav() {
             <NavLink to="/kanban/assignee" className={linkClass}>
               קנבן לפי אחראי
             </NavLink>
+            {/* Embed login has no settings menu; it manages its own business's people here. */}
+            {user?.is_embed && (
+              <NavLink to="/users" className={linkClass}>
+                משתמשים
+              </NavLink>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

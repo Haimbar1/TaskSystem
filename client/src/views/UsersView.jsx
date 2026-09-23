@@ -41,6 +41,18 @@ export default function UsersView() {
     }
   }
 
+  async function handleDelete(u) {
+    const label = u.name || u.email;
+    if (!window.confirm(`למחוק את ${label}? המשימות שלו יישארו, בלי שיוך אליו.`)) return;
+    try {
+      await api.deleteUser(u.id);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (err) {
+      window.alert('שגיאה במחיקת המשתמש');
+      console.error(err);
+    }
+  }
+
   function handleUserSaved(updated) {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
   }
@@ -123,6 +135,12 @@ export default function UsersView() {
                   className="text-emerald-700 hover:underline text-sm"
                 >
                   ערוך
+                </button>
+                <button
+                  onClick={() => handleDelete(u)}
+                  className="text-red-600 hover:underline text-sm mr-3"
+                >
+                  מחק
                 </button>
               </td>
             </tr>

@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { EMBED_USER_EMAIL, getEmbedToken, ensureOptionalUserEmail } from '../embed.js';
+import { EMBED_USER_EMAIL, getEmbedToken, ensureOptionalUserEmail, isEmbedUser } from '../embed.js';
 
 const router = Router();
 
 // Users are managed in the portal. The exception is an embedded business (see embed.js): its
-// people never log in through the portal, so a super admin adds and edits them here instead.
+// people never log in through the portal, so they're managed here instead — by a super admin, or
+// by the business itself through its embed login (always scoped to req.tenantId, its own business).
 async function requireEmbedUserAdmin(req, res, next) {
-  if (!req.user.is_super_admin) return res.status(403).json({ error: 'Super admins only' });
+  if (!req.user.is_super_admin && !isEmbedUser(req.user)) {
+    return res.status(403).json({ error: 'Not allowed' });
+  }
   if (!(await getEmbedToken(req.tenantId))) {
     return res.status(403).json({ error: 'Users of this business are managed in the portal' });
   }
@@ -69,6 +72,39 @@ router.patch('/:id', requireEmbedUserAdmin, async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
+});
+
+// Deletes a user (see requireEmbedUserAdmin for who may). Their tasks and history stay: the
+// references that don't cascade (task creator, activity log, uploaded files) are cleared first;
+// assignments, watchers and notifications go with the user (ON DELETE CASCADE).
+router.delete('/:id', requireEmbedUserAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      'SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND email IS DISTINCT FROM $3 FOR UPDATE',
+      [id, req.tenantId, EMBED_USER_EMAIL]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Not found' });
+    }
+    await client.query('UPDATE tasks SET created_by = NULL WHERE created_by = $1', [id]);
+    await client.query('UPDATE task_activity_log SET user_id = NULL WHERE user_id = $1', [id]);
+    await client.query('UPDATE task_files SET uploaded_by = NULL WHERE uploaded_by = $1', [id]);
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
+    await client.query('COMMIT');
+    res.status(204).end();
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('DELETE /api/users/:id failed:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 export default router;

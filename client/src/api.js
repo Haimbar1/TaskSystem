@@ -22,6 +22,7 @@ export const api = {
   getUsers: () => request('/api/users'),
   inviteUser: (data) => request('/api/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteUser: (id) => request(`/api/users/${id}`, { method: 'DELETE' }),
   getSwitcherTenants: () => request('/api/auth/switcher/tenants'),
   getSwitchTenantToken: (portalTenantId) =>
     request('/api/auth/switcher/tenant', { method: 'POST', body: JSON.stringify({ portalTenantId }) }),

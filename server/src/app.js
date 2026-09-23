@@ -11,6 +11,7 @@ import cronRoutes from './routes/cronRoutes.js';
 import tenantRoutes from './routes/tenantRoutes.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { requireTenant } from './middleware/tenant.js';
+import { dropStaleEmbedSession } from './embed.js';
 
 export const app = express();
 
@@ -47,6 +48,7 @@ app.use(
 );
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(dropStaleEmbedSession);
 
 app.use('/api/auth', authRoutes);
 // Super-admin only (each route checks req.user itself — no tenant to scope

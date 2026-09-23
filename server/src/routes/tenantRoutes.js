@@ -97,17 +97,18 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmi
   });
 });
 
-// Tenant admin's embed token for their own business (embedding the app in e.g. Monday; see
-// embed.js). POST creates a new one, replacing the old; DELETE turns embedding off.
-router.get('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+// The active business's embed token (embedding the app in e.g. Monday; see embed.js). Super admin
+// only: it's set up by the platform owner, not by the business's own admins.
+// POST creates a new one, replacing the old; DELETE turns embedding off.
+router.get('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   res.json({ token: await getEmbedToken(req.tenantId) });
 });
 
-router.post('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+router.post('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   res.json({ token: await rotateEmbedToken(req.tenantId) });
 });
 
-router.delete('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+router.delete('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   await clearEmbedToken(req.tenantId);
   res.json({ token: null });
 });

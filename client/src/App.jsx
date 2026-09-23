@@ -63,7 +63,7 @@ export default function App() {
             />
             <Route
               path="/embed-settings"
-              element={canManageUsers ? <EmbedSettingsView /> : <Navigate to="/" replace />}
+              element={user.is_super_admin ? <EmbedSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/signup"

@@ -90,6 +90,10 @@ export default function EmbedSettingsView() {
             >
               בטל קישור
             </button>
+            {/* Full load (not navigate) so /me picks up that this business is now embedded. */}
+            <a href="/users" className="px-3 py-2 rounded-lg border text-sm mr-auto">
+              משתמשי העסק ←
+            </a>
           </div>
         </div>
       ) : (

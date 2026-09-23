@@ -96,6 +96,13 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
                   הטמעה ב-Monday
                 </button>
               )}
+              {/* Only for an embedded business (activeTenantHasEmbed is super-admin only): its
+                  people never log in through the portal, so they're managed here. */}
+              {user?.activeTenantHasEmbed && (
+                <button onClick={() => go('/users')} className={itemClass}>
+                  משתמשי העסק (Monday)
+                </button>
+              )}
             </>
           )}
 

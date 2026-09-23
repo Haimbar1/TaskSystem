@@ -3,7 +3,7 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { provisionFromPortal } from '../portalProvision.js';
-import { userForEmbedToken, isEmbedUser } from '../embed.js';
+import { userForEmbedToken, isEmbedUser, getEmbedToken } from '../embed.js';
 
 const router = Router();
 
@@ -153,6 +153,9 @@ router.get('/me', async (req, res) => {
       activeTenantId,
       activeTenantName: rows[0]?.name || null,
       is_embed: isEmbedUser(req.user),
+      // Super admins manage the users of embedded businesses here (their people never log in
+      // through the portal, which is where users are managed otherwise).
+      activeTenantHasEmbed: req.user.is_super_admin ? Boolean(await getEmbedToken(activeTenantId)) : false,
     },
   });
 });

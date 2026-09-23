@@ -1,8 +1,18 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { EMBED_USER_EMAIL } from '../embed.js';
+import { EMBED_USER_EMAIL, getEmbedToken } from '../embed.js';
 
 const router = Router();
+
+// Users are managed in the portal. The exception is an embedded business (see embed.js): its
+// people never log in through the portal, so a super admin adds and edits them here instead.
+async function requireEmbedUserAdmin(req, res, next) {
+  if (!req.user.is_super_admin) return res.status(403).json({ error: 'Super admins only' });
+  if (!(await getEmbedToken(req.tenantId))) {
+    return res.status(403).json({ error: 'Users of this business are managed in the portal' });
+  }
+  next();
+}
 
 // The embed service user (see embed.js) isn't a person, so it's never listed or assignable.
 router.get('/', async (req, res) => {
@@ -13,17 +23,13 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// Admin-only: pre-creates a user row so that person can sign in with Google
-// afterwards (see auth/googleStrategy.js — it refuses unknown emails).
+// Pre-creates a user row (see requireEmbedUserAdmin for who may).
 // Phone is required — it's the only way notifications.js/whatsapp.js can
 // reach this person, since WhatsApp sends are silently skipped without one.
-router.post('/invite', async (req, res) => {
+router.post('/invite', requireEmbedUserAdmin, async (req, res) => {
   // req.tenantId already reflects whichever business a super admin has
   // switched to (see middleware/tenant.js) — so this always creates the
   // user in that business, no separate "which tenant" field needed.
-  if (req.user.role !== 'admin' && !req.user.is_super_admin) {
-    return res.status(403).json({ error: 'Admins only' });
-  }
   const { email, name, phone } = req.body;
   if (!email || !phone) {
     return res.status(400).json({ error: 'email and phone are required' });
@@ -43,13 +49,10 @@ router.post('/invite', async (req, res) => {
   }
 });
 
-// Admin-only: updates an existing user's name/phone. Email is left alone
-// here — it's the identity key Google login matches on (see
+// Updates an existing user's name/phone (see requireEmbedUserAdmin for who may). Email is left
+// alone here — it's the identity key Google login matches on (see
 // auth/googleStrategy.js), so changing it isn't part of this simple edit.
-router.patch('/:id', async (req, res) => {
-  if (req.user.role !== 'admin' && !req.user.is_super_admin) {
-    return res.status(403).json({ error: 'Admins only' });
-  }
+router.patch('/:id', requireEmbedUserAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, phone } = req.body;
   if (!phone) {

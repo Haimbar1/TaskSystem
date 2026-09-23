@@ -7,11 +7,23 @@ import SettingsMenu from './SettingsMenu.jsx';
 import AppSwitcher from './AppSwitcher.jsx';
 import { showWhatsAppPreview } from '../whatsappPreview.js';
 
+function inIframe() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true; // cross-origin parent blocks access to window.top
+  }
+}
+
 export default function Nav() {
   const { user, bumpRefresh } = useAppContext();
   const [showTaskForm, setShowTaskForm] = useState(false);
 
   const canManageUsers = user?.role === 'admin' || user?.is_super_admin;
+  // The embed login is shared by the whole browser, so opening the embed link replaces a real
+  // login in other tabs too. Outside the iframe it can be logged out of; inside it, logging out
+  // would strand the iframe on a login page Google won't render there.
+  const showLogout = !user?.is_embed || !inIframe();
   const linkClass = ({ isActive }) =>
     `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive ? 'bg-white text-teal-900' : 'text-teal-50/80 hover:bg-white/10 hover:text-white'
@@ -65,10 +77,10 @@ export default function Nav() {
             >
               + משימה חדשה
             </button>
-            {!user?.is_embed && (
+            {showLogout && (
               <>
                 <span className="hidden md:inline text-sm text-teal-100/80">
-                  {user?.name || user?.email}
+                  {user?.is_embed ? 'מחובר דרך Monday' : user?.name || user?.email}
                 </span>
                 <button
                   onClick={handleLogout}

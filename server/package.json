@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "migrate": "node src/migrate.js"
+    "migrate": "node src/migrate.js",
+    "embed-token": "node src/embedToken.js"
   },
   "dependencies": {
     "connect-pg-simple": "^9.0.1",

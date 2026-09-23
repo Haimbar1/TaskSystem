@@ -1,10 +1,26 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useAppContext } from '../context/AppContext.jsx';
 import { PRIORITY_LABELS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 
+// Last creator picked on this device, so an embedded (shared-login) user doesn't re-pick every time.
+const CREATOR_KEY = 'tasks.embedCreatorId';
+function readSavedCreator() {
+  try {
+    return localStorage.getItem(CREATOR_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
+  const { user } = useAppContext();
+  // Logged in through an embed, everyone shares one login, so a new task must say who created it
+  // (they're the one notified on its later changes).
+  const needsCreator = !isEdit && user?.is_embed;
+  const [createdBy, setCreatedBy] = useState(needsCreator ? readSavedCreator() : '');
   const [users, setUsers] = useState([]);
   const [usersError, setUsersError] = useState('');
   const [title, setTitle] = useState(task?.title || '');
@@ -19,7 +35,11 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   useEffect(() => {
     api
       .getUsers()
-      .then(setUsers)
+      .then((list) => {
+        setUsers(list);
+        // Drop a remembered creator who's no longer in this business.
+        setCreatedBy((id) => (list.some((u) => u.id === id) ? id : ''));
+      })
       .catch((err) => setUsersError(err.message));
   }, []);
 
@@ -33,6 +53,10 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
       setError('חובה להזין כותרת');
       return;
     }
+    if (needsCreator && !createdBy) {
+      setError('חובה לבחור מי יוצר את המשימה');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -43,6 +67,14 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         due_date: dueDate || null,
         assignee_ids: assigneeIds,
       };
+      if (needsCreator) {
+        payload.created_by = createdBy;
+        try {
+          localStorage.setItem(CREATOR_KEY, createdBy);
+        } catch {
+          // Storage unavailable (e.g. blocked in the iframe) — they'll just pick again next time.
+        }
+      }
       const saved = isEdit ? await api.updateTask(task.id, payload) : await api.createTask(payload);
       (onSaved || onCreated)?.(saved);
       onClose();
@@ -73,6 +105,24 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <form onSubmit={handleSubmit} className="bg-white rounded p-4 w-full max-w-md space-y-3">
         <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
+
+        {needsCreator && (
+          <div>
+            <label className="block text-sm mb-1">יוצר המשימה *</label>
+            <select
+              className="w-full border rounded p-2"
+              value={createdBy}
+              onChange={(e) => setCreatedBy(e.target.value)}
+            >
+              <option value="">בחר/י…</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm mb-1">כותרת</label>

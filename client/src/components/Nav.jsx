@@ -27,8 +27,14 @@ export default function Nav() {
       <nav className="bg-gradient-to-l from-teal-950 to-teal-900 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <AppSwitcher />
-            <SettingsMenu user={user} canManageUsers={canManageUsers} onLogout={handleLogout} />
+            {/* Embedded (shared business login): no portal identity to switch modules with,
+                and nothing in the settings menu applies — logging out would just strand the iframe. */}
+            {!user?.is_embed && (
+              <>
+                <AppSwitcher />
+                <SettingsMenu user={user} canManageUsers={canManageUsers} onLogout={handleLogout} />
+              </>
+            )}
             <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold">
               מ
             </div>
@@ -59,15 +65,19 @@ export default function Nav() {
             >
               + משימה חדשה
             </button>
-            <span className="hidden md:inline text-sm text-teal-100/80">
-              {user?.name || user?.email}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-2 rounded-lg border border-white/20 text-sm text-teal-50 hover:bg-white/10 transition-colors"
-            >
-              התנתקות
-            </button>
+            {!user?.is_embed && (
+              <>
+                <span className="hidden md:inline text-sm text-teal-100/80">
+                  {user?.name || user?.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-lg border border-white/20 text-sm text-teal-50 hover:bg-white/10 transition-colors"
+                >
+                  התנתקות
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>

@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { EMBED_USER_EMAIL } from '../embed.js';
 
 const router = Router();
 
+// The embed service user (see embed.js) isn't a person, so it's never listed or assignable.
 router.get('/', async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT id, name, email, phone, role FROM users WHERE tenant_id = $1',
-    [req.tenantId]
+    'SELECT id, name, email, phone, role FROM users WHERE tenant_id = $1 AND email <> $2',
+    [req.tenantId, EMBED_USER_EMAIL]
   );
   res.json(rows);
 });

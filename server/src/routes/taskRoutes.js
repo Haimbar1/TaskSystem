@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { logActivityAndNotify } from '../services/notifications.js';
+import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
@@ -43,13 +44,26 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { title, description, priority = 'normal', due_date, assignee_ids = [] } = req.body;
+
+  // Logged in through an embed (shared service user): the real creator is picked in the form, so
+  // they're the one recorded (and notified on later changes) instead of the service user.
+  let creatorId = req.user.id;
+  if (isEmbedUser(req.user)) {
+    const { rows } = await pool.query(
+      'SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND email <> $3',
+      [req.body.created_by || null, req.tenantId, EMBED_USER_EMAIL]
+    );
+    if (!rows[0]) return res.status(400).json({ error: 'created_by is required' });
+    creatorId = rows[0].id;
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `INSERT INTO tasks (tenant_id, title, description, priority, due_date, created_by, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'new') RETURNING *`,
-      [req.tenantId, title, description, priority, due_date, req.user.id]
+      [req.tenantId, title, description, priority, due_date, creatorId]
     );
     const task = rows[0];
     for (const userId of assignee_ids) {
@@ -61,7 +75,7 @@ router.post('/', async (req, res) => {
     await client.query('COMMIT');
     const whatsappPreviews = await logActivityAndNotify({
       task,
-      userId: req.user.id,
+      userId: creatorId,
       field: 'created',
       oldValue: null,
       newValue: null,

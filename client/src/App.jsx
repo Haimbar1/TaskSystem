@@ -8,6 +8,7 @@ import KanbanStatusView from './views/KanbanStatusView.jsx';
 import KanbanAssigneeView from './views/KanbanAssigneeView.jsx';
 import UsersView from './views/UsersView.jsx';
 import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
+import EmbedSettingsView from './views/EmbedSettingsView.jsx';
 import WhatsAppPreviewModal from './components/WhatsAppPreviewModal.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
@@ -23,9 +24,16 @@ export default function App() {
     // verified this user and is handing off a short-lived token. The server (not this
     // page) verifies it and sets the real session cookie, so just forward the whole
     // browser there — it redirects back here once logged in.
-    const ssoToken = new URLSearchParams(window.location.search).get('sso_token');
+    const params = new URLSearchParams(window.location.search);
+    const ssoToken = params.get('sso_token');
     if (ssoToken) {
       window.location.href = `${API_URL}/api/auth/sso?token=${encodeURIComponent(ssoToken)}`;
+      return;
+    }
+    // Embedded in another system (e.g. Monday) with a per-business token — same hand-off.
+    const embedToken = params.get('embed_token');
+    if (embedToken) {
+      window.location.href = `${API_URL}/api/auth/embed?token=${encodeURIComponent(embedToken)}`;
       return;
     }
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null)).finally(() => setLoading(false));
@@ -52,6 +60,10 @@ export default function App() {
             <Route
               path="/whatsapp-settings"
               element={canManageUsers ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/embed-settings"
+              element={canManageUsers ? <EmbedSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/signup"

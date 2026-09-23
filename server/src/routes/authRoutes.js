@@ -3,6 +3,7 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { provisionFromPortal } from '../portalProvision.js';
+import { userForEmbedToken, isEmbedUser } from '../embed.js';
 
 const router = Router();
 
@@ -72,6 +73,22 @@ router.get('/sso', async (req, res, next) => {
   }
 });
 
+// Embedded in another system (e.g. a Monday board) for one business: the URL carries that
+// business's embed token (see embed.js), which logs in as the business's shared service user.
+router.get('/embed', async (req, res, next) => {
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  try {
+    const user = await userForEmbedToken(String(req.query.token || ''));
+    if (!user) return res.redirect(`${clientUrl}?embedError=invalid-token`);
+    req.logIn(user, (err) => {
+      if (err) return next(err);
+      res.redirect(clientUrl);
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // In-app "switch to another module" widget: proxies to the portal's server-to-server
 // SSO endpoints (portal is the source of truth for who can open what). The email comes
 // from the real session, never from the request.
@@ -131,7 +148,12 @@ router.get('/me', async (req, res) => {
   const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [activeTenantId]);
 
   res.json({
-    user: { ...req.user, activeTenantId, activeTenantName: rows[0]?.name || null },
+    user: {
+      ...req.user,
+      activeTenantId,
+      activeTenantName: rows[0]?.name || null,
+      is_embed: isEmbedUser(req.user),
+    },
   });
 });
 

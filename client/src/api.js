@@ -27,7 +27,10 @@ export const api = {
   getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
-  switchTenant: (tenantId) => request('/api/auth/switch-tenant', { method: 'POST', body: JSON.stringify({ tenantId }) }),
+  getEmbedToken: () => request('/api/tenants/embed-token'),
+  rotateEmbedToken: () => request('/api/tenants/embed-token', { method: 'POST' }),
+  clearEmbedToken: () => request('/api/tenants/embed-token', { method: 'DELETE' }),
+  switchTenant:(tenantId) => request('/api/auth/switch-tenant', { method: 'POST', body: JSON.stringify({ tenantId }) }),
   me: () => request('/api/auth/me'),
   getSwitcherModules: () => request('/api/auth/switcher/modules'),
   getSwitcherToken: (moduleKey) =>

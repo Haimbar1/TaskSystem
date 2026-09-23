@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
+import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
 
 const router = Router();
 
@@ -94,6 +95,21 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmi
     whatsapp_phone_number_id: t.whatsapp_phone_number_id || '',
     whatsapp_waba_id: t.whatsapp_waba_id || '',
   });
+});
+
+// Tenant admin's embed token for their own business (embedding the app in e.g. Monday; see
+// embed.js). POST creates a new one, replacing the old; DELETE turns embedding off.
+router.get('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  res.json({ token: await getEmbedToken(req.tenantId) });
+});
+
+router.post('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  res.json({ token: await rotateEmbedToken(req.tenantId) });
+});
+
+router.delete('/embed-token', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  await clearEmbedToken(req.tenantId);
+  res.json({ token: null });
 });
 
 export default router;

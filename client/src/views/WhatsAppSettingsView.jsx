@@ -10,6 +10,8 @@ export default function WhatsAppSettingsView() {
   const [accessToken, setAccessToken] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
+  const [sendLive, setSendLive] = useState(false);
+  const [linked, setLinked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -18,6 +20,8 @@ export default function WhatsAppSettingsView() {
       setTokenSet(s.whatsapp_access_token_set);
       setPhoneNumberId(s.whatsapp_phone_number_id);
       setWabaId(s.whatsapp_waba_id);
+      setSendLive(!!s.whatsapp_send_live);
+      setLinked(!!s.linked);
     });
   }
 
@@ -32,10 +36,18 @@ export default function WhatsAppSettingsView() {
         whatsapp_access_token: accessToken,
         whatsapp_phone_number_id: phoneNumberId,
         whatsapp_waba_id: wabaId,
+        whatsapp_send_live: sendLive,
       });
       setTokenSet(s.whatsapp_access_token_set);
+      setPhoneNumberId(s.whatsapp_phone_number_id);
+      setWabaId(s.whatsapp_waba_id);
+      setSendLive(!!s.whatsapp_send_live);
       setAccessToken('');
-      setMessage('נשמר בהצלחה');
+      setMessage(
+        !s.linked || s.vault?.ok
+          ? 'נשמר בהצלחה'
+          : 'נשמר כאן, אבל השמירה בפורטל נכשלה — נסו שוב או עדכנו בפורטל ב"מזהים וחיבורים"'
+      );
     } catch (err) {
       setMessage('שגיאה בשמירה');
       console.error(err);
@@ -48,8 +60,9 @@ export default function WhatsAppSettingsView() {
     <div className="bg-white border rounded-xl shadow-sm p-4 max-w-lg">
       <h2 className="font-semibold mb-3">הגדרות וואטסאפ לעסק</h2>
       <p className="text-gray-500 text-sm mb-3">
-        המזהים האלה שייכים לעסק הנוכחי בלבד. אם לא ימולאו, המערכת תשתמש
-        בברירת המחדל הגלובלית (אם קיימת).
+        המזהים האלה שייכים לעסק הנוכחי בלבד.
+        {linked &&
+          ' הם נשמרים בפורטל ("מזהים וחיבורים") ומשותפים למערכת ההודעות ולבוט APP — מספיק להזין אותם באחד המקומות.'}
       </p>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
@@ -80,6 +93,21 @@ export default function WhatsAppSettingsView() {
             onChange={(e) => setWabaId(e.target.value)}
           />
         </div>
+        <label className="flex items-start gap-2 border rounded p-2 bg-gray-50">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={sendLive}
+            onChange={(e) => setSendLive(e.target.checked)}
+          />
+          <span className="text-sm">
+            <span className="font-medium">שליחה בפועל</span>
+            <span className="block text-gray-500">
+              כשכבוי — ההודעות רק מוצגות כתצוגה מקדימה ולא נשלחות. להדליק אחרי שהמזהים הוזנו והתבניות אושרו ב-Meta
+              למספר של העסק.
+            </span>
+          </span>
+        </label>
         <button
           type="submit"
           disabled={saving}

@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
+import { whatsappCredentials, writeToVault, ensureSendLiveColumn } from '../tenantSecrets.js';
 
 const router = Router();
 
@@ -54,40 +55,52 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res) => {
   }
 });
 
-// Tenant admin's own business's WhatsApp Business credentials — lets each
-// business send from its own number instead of sharing the WHATSAPP_* env
-// vars (see services/whatsapp.js, which falls back to those env vars when
-// these are unset). Access token is never sent back to the client in full.
+// Tenant admin's own business's WhatsApp Business credentials. They live in the portal vault,
+// shared with the WhatsApp system and BotApp (see tenantSecrets.js): this shows the effective
+// values and writes what's saved here into the vault too (and onto the tenants row, for a
+// business not linked to the portal). Access token is never sent back to the client in full.
+async function whatsappSettingsResponse(tenantId, extra = {}) {
+  const { values, sources, linked, sendLive } = await whatsappCredentials(tenantId);
+  return {
+    whatsapp_access_token_set: !!values.whatsapp_access_token,
+    whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
+    whatsapp_waba_id: values.whatsapp_waba_id || '',
+    whatsapp_send_live: sendLive,
+    sources,
+    linked,
+    ...extra,
+  };
+}
+
 router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
-  const { rows } = await pool.query(
-    'SELECT whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id FROM tenants WHERE id = $1',
-    [req.tenantId]
-  );
-  const t = rows[0] || {};
-  res.json({
-    whatsapp_access_token_set: !!t.whatsapp_access_token,
-    whatsapp_phone_number_id: t.whatsapp_phone_number_id || '',
-    whatsapp_waba_id: t.whatsapp_waba_id || '',
-  });
+  res.json(await whatsappSettingsResponse(req.tenantId));
 });
 
 router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
-  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id } = req.body;
-  const { rows } = await pool.query(
+  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_send_live } = req.body;
+  await ensureSendLiveColumn();
+  await pool.query(
     `UPDATE tenants SET
        whatsapp_access_token = COALESCE(NULLIF($1, ''), whatsapp_access_token),
        whatsapp_phone_number_id = $2,
-       whatsapp_waba_id = $3
-     WHERE id = $4
-     RETURNING whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id`,
-    [whatsapp_access_token, whatsapp_phone_number_id || '', whatsapp_waba_id || '', req.tenantId]
+       whatsapp_waba_id = $3,
+       whatsapp_send_live = COALESCE($5, whatsapp_send_live)
+     WHERE id = $4`,
+    [
+      whatsapp_access_token,
+      whatsapp_phone_number_id || '',
+      whatsapp_waba_id || '',
+      req.tenantId,
+      typeof whatsapp_send_live === 'boolean' ? whatsapp_send_live : null,
+    ]
   );
-  const t = rows[0];
-  res.json({
-    whatsapp_access_token_set: !!t.whatsapp_access_token,
-    whatsapp_phone_number_id: t.whatsapp_phone_number_id || '',
-    whatsapp_waba_id: t.whatsapp_waba_id || '',
-  });
+  const vault = await writeToVault(
+    req.tenantId,
+    { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id },
+    req.user?.email
+  );
+  if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
+  res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
 // The active business's embed token (embedding the app in e.g. Monday; see embed.js). Super admin

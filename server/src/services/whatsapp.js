@@ -2,32 +2,30 @@ import { pool } from '../db.js';
 import { WHATSAPP_TEMPLATES } from './whatsappTemplates.js';
 import { STATUS_LABELS } from '../labels.js';
 import { formatDate } from '../dateFormat.js';
+import { whatsappCredentials } from '../tenantSecrets.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
-// No verified WhatsApp Business credentials from the client yet — every
-// message is built and returned as a preview (name + resolved {{n}} values)
-// instead of actually being sent, so the flow can be checked visually
-// before switching this on. Flip WHATSAPP_SEND_LIVE=true once real
-// credentials are in and the templates are approved for this number.
-const LIVE = process.env.WHATSAPP_SEND_LIVE === 'true';
+// Real sending is switched on per business ("שליחה בפועל" in the WhatsApp settings screen,
+// tenants.whatsapp_send_live). Until then every message is built and returned as a preview
+// (name + resolved {{n}} values) so the flow can be checked visually; switch it on once the
+// business's credentials are in and the templates are approved for its number. A business that
+// never touched the switch follows WHATSAPP_SEND_LIVE (the old platform-wide setting).
 
-// Builds (and, only in live mode, sends) the WhatsApp message for one
+// Builds (and, only when the business sends for real, sends) the WhatsApp message for one
 // recipient/event. Returns null when there's nothing to send (no phone on
 // file, or no template for this event type) — otherwise the resolved
-// preview: { to, templateName, params, text }.
+// preview: { to, templateName, params, text, live }.
 export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
   const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
   const recipient = userRows[0];
   if (!recipient?.phone) return null;
 
-  const { rows: tenantRows } = await pool.query(
-    'SELECT whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id FROM tenants WHERE id = $1',
-    [tenantId]
-  );
-  const tenantCreds = tenantRows[0] || {};
-  const accessToken = tenantCreds.whatsapp_access_token || process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = tenantCreds.whatsapp_phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
+  // The portal vault's values (see tenantSecrets.js); only the original business falls back to env.
+  const { values: tenantCreds, sendLive } = await whatsappCredentials(tenantId);
+  const accessToken = tenantCreds.whatsapp_access_token;
+  const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
+  const live = sendLive && !!accessToken && !!phoneNumberId;
 
   const template = WHATSAPP_TEMPLATES[eventType];
   if (!template) return null;
@@ -42,9 +40,9 @@ export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, 
     ...extra,
   });
 
-  const message = { to: recipient.phone, templateName: template.name, params, text: template.render(params) };
+  const message = { to: recipient.phone, templateName: template.name, params, text: template.render(params), live };
 
-  if (LIVE) {
+  if (live) {
     const res = await fetch(`${GRAPH_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {

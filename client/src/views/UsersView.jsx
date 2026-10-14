@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import UserEditModal from '../components/UserEditModal.jsx';
+import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 
 const ROLE_LABELS = { admin: 'מנהל', member: 'חבר' };
 
@@ -60,7 +61,10 @@ export default function UsersView() {
   return (
     <div className="space-y-4">
       <div className="bg-white border rounded-xl shadow-sm p-4">
-        <h2 className="font-semibold mb-3">הוספת משתמש</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">הוספת משתמש</h2>
+          <CloseSettingsButton />
+        </div>
         <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
           <div>
             <label className="block text-sm mb-1">

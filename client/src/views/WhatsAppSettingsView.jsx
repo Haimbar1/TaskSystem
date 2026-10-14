@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useAppContext } from '../context/AppContext.jsx';
+import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 
 // Per-business WhatsApp Business credentials (see server/src/routes/tenantRoutes.js).
 // The access token is write-only here — the server never sends it back in
 // full, only whether one is set — so the field starts blank even when a
 // token already exists, and is left untouched on save unless retyped.
+// Only the platform owner (super admin) may change them; a business admin sees them read-only.
 export default function WhatsAppSettingsView() {
+  const { user } = useAppContext();
+  const canEdit = !!user?.is_super_admin;
   const [tokenSet, setTokenSet] = useState(false);
   const [accessToken, setAccessToken] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
@@ -54,12 +59,27 @@ export default function WhatsAppSettingsView() {
 
   return (
     <div className="bg-white border rounded-xl shadow-sm p-4 max-w-lg">
-      <h2 className="font-semibold mb-3">הגדרות וואטסאפ לעסק</h2>
-      <p className="text-gray-500 text-sm mb-3">
-        המזהים האלה שייכים לעסק הנוכחי בלבד.
-        {linked &&
-          ' הם נשמרים בפורטל ("מזהים וחיבורים") ומשותפים למערכת ההודעות ולבוט APP — מספיק להזין אותם באחד המקומות.'}
-      </p>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold">הגדרות וואטסאפ לעסק</h2>
+        <CloseSettingsButton />
+      </div>
+      {canEdit ? (
+        <p className="text-gray-500 text-sm mb-3">
+          המזהים האלה שייכים לעסק הנוכחי בלבד.
+          {linked &&
+            ' הם נשמרים בפורטל ("מזהים וחיבורים") ומשותפים למערכת ההודעות ולבוט APP — מספיק להזין אותם באחד המקומות.'}
+        </p>
+      ) : (
+        <div className="text-sm mb-3 space-y-1">
+          <p className={tokenSet && phoneNumberId ? 'text-emerald-700 font-medium' : 'text-gray-600 font-medium'}>
+            {tokenSet && phoneNumberId
+              ? 'וואטסאפ מחובר — עדכוני המשימות נשלחים בוואטסאפ.'
+              : 'וואטסאפ עדיין לא מחובר לעסק — לא נשלחות הודעות.'}
+          </p>
+          <p className="text-gray-500">שינוי ההגדרות נעשה על ידי מנהל המערכת בלבד.</p>
+        </div>
+      )}
+      {canEdit && (
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-sm mb-1">
@@ -102,6 +122,7 @@ export default function WhatsAppSettingsView() {
         </button>
         {message && <span className="text-sm text-gray-600 mr-3">{message}</span>}
       </form>
+      )}
 
       {/* Mirrors server/src/services/notifications.js and routes/cronRoutes.js — keep in sync. */}
       <div className="mt-5 border-t pt-4 text-sm space-y-2">

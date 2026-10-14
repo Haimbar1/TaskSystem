@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 
 // The current business's embed URL (for embedding the app in Monday etc.; see server/src/embed.js).
 // Anyone with the URL gets in as the business's shared login, so it can be replaced or turned off.
@@ -52,7 +53,10 @@ export default function EmbedSettingsView() {
 
   return (
     <div className="bg-white border rounded-xl shadow-sm p-4 max-w-2xl">
-      <h2 className="font-semibold mb-3">הטמעה ב-Monday</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold">הטמעה ב-Monday</h2>
+        <CloseSettingsButton />
+      </div>
       <p className="text-gray-500 text-sm mb-3">
         קישור לעסק הנוכחי שאפשר להטמיע ב-Monday. מי שפותח אותו נכנס בלי התחברות, וביצירת משימה
         חדשה בוחר מי יוצר אותה. כל מי שיש לו את הקישור יכול להיכנס, לכן כדאי לשתף אותו רק במקום

@@ -75,7 +75,8 @@ router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin,
   res.json(await whatsappSettingsResponse(req.tenantId));
 });
 
-router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+// Business admins can see the settings (GET above); only the platform owner changes them.
+router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id } = req.body;
   await pool.query(
     `UPDATE tenants SET

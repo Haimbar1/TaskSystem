@@ -10,16 +10,33 @@ export default function KanbanAssigneeView() {
   const { refreshKey } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [savingIds, setSavingIds] = useState([]);
 
   useEffect(() => {
     api.getTasks().then(setTasks).catch(console.error);
     api.getUsers().then(setUsers).catch(console.error);
   }, [refreshKey]);
 
+  // The card moves at once (the save also sends WhatsApp, which takes a moment) and shows that
+  // it's saving; if the save fails it goes back to where it was.
   async function moveTask(taskId, userId) {
-    const assignee_ids = userId === UNASSIGNED ? [] : [userId];
-    const updated = await api.updateTask(taskId, { assignee_ids });
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    const before = tasks.find((t) => String(t.id) === String(taskId));
+    if (!before) return;
+    const assignees = userId === UNASSIGNED ? [] : users.filter((u) => u.id === userId);
+    const prevIds = (before.assignees || []).map((a) => a.id);
+    if (prevIds.length === assignees.length && assignees.every((a) => prevIds.includes(a.id))) return;
+    setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, assignees } : t)));
+    setSavingIds((ids) => [...ids, before.id]);
+    try {
+      const updated = await api.updateTask(before.id, { assignee_ids: assignees.map((a) => a.id) });
+      setTasks((prev) => prev.map((t) => (t.id === before.id ? updated : t)));
+    } catch (err) {
+      console.error(err);
+      setTasks((prev) => prev.map((t) => (t.id === before.id ? before : t)));
+      alert('העברת המשימה נכשלה — היא הוחזרה למקומה');
+    } finally {
+      setSavingIds((ids) => ids.filter((id) => id !== before.id));
+    }
   }
 
   const columns = [{ id: UNASSIGNED, name: 'לא משויך' }, ...users];
@@ -54,6 +71,7 @@ export default function KanbanAssigneeView() {
                   <KanbanCard
                     key={t.id}
                     task={t}
+                    saving={savingIds.includes(t.id)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />
                 ))}

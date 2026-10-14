@@ -10,14 +10,28 @@ const STATUSES = Object.keys(STATUS_LABELS);
 export default function KanbanStatusView() {
   const { refreshKey } = useAppContext();
   const [tasks, setTasks] = useState([]);
+  const [savingIds, setSavingIds] = useState([]);
 
   useEffect(() => {
     api.getTasks().then(setTasks).catch(console.error);
   }, [refreshKey]);
 
+  // The card moves at once (the save also sends WhatsApp, which takes a moment) and shows that
+  // it's saving; if the save fails it goes back to its old column.
   async function moveTask(taskId, newStatus) {
-    const updated = await api.updateTask(taskId, { status: newStatus });
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
+    const before = tasks.find((t) => String(t.id) === String(taskId));
+    if (!before || before.status === newStatus) return;
+    setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, status: newStatus } : t)));
+    setSavingIds((ids) => [...ids, before.id]);
+    try {
+      await api.updateTask(before.id, { status: newStatus });
+    } catch (err) {
+      console.error(err);
+      setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, status: before.status } : t)));
+      alert('העברת המשימה נכשלה — היא הוחזרה למקומה');
+    } finally {
+      setSavingIds((ids) => ids.filter((id) => id !== before.id));
+    }
   }
 
   return (
@@ -46,6 +60,7 @@ export default function KanbanStatusView() {
                     key={t.id}
                     task={t}
                     showAssignees
+                    saving={savingIds.includes(t.id)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />
                 ))}

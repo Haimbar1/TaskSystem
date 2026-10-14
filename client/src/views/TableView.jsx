@@ -28,9 +28,19 @@ export default function TableView() {
     setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
   }
 
+  // Shown at once; the save (which also sends WhatsApp) replaces it when it answers, or undoes it.
   async function updateAssignees(taskId, assigneeIds) {
-    const updated = await api.updateTask(taskId, { assignee_ids: assigneeIds });
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    const before = tasks.find((t) => t.id === taskId);
+    const assignees = users.filter((u) => assigneeIds.includes(u.id));
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, assignees } : t)));
+    try {
+      const updated = await api.updateTask(taskId, { assignee_ids: assigneeIds });
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+    } catch (err) {
+      console.error(err);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? before : t)));
+      alert('עדכון האחראים נכשל');
+    }
   }
 
   function handleSaved(updated) {

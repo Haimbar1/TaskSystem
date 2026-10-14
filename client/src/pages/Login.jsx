@@ -1,4 +1,6 @@
 export default function Login() {
+  // set by the server when the portal gives this Google account no access to the task system
+  const noAccess = new URLSearchParams(window.location.search).get('loginError') === 'no-access';
   return (
     <div
       dir="rtl"
@@ -24,6 +26,11 @@ export default function Login() {
           </svg>
           התחברות עם Google
         </a>
+        {noAccess && (
+          <p className="text-sm text-red-600">
+            לחשבון הזה אין גישה למערכת המשימות באף עסק בפורטל. מנהל העסק יכול לתת גישה ב-portal.smartesek.com.
+          </p>
+        )}
       </div>
     </div>
   );

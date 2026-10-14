@@ -10,13 +10,13 @@ const router = Router();
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback', (req, res, next) => {
-  passport.authenticate('google', (err, user) => {
+  passport.authenticate('google', (err, user, info) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     if (err) return next(err);
     // failureRedirect defaults to a path on THIS (API) host, which has no
     // /login route — the client is a separate SPA that always renders
     // Login when logged out, so bounce back to its root instead.
-    if (!user) return res.redirect(clientUrl);
+    if (!user) return res.redirect(info?.message === 'no-access' ? `${clientUrl}?loginError=no-access` : clientUrl);
     req.logIn(user, (loginErr) => {
       if (loginErr) return next(loginErr);
       res.redirect(clientUrl);

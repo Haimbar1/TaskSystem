@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
       );
     }
     await client.query('COMMIT');
-    const whatsappPreviews = await logActivityAndNotify({
+    const whatsappMessages = await logActivityAndNotify({
       task,
       userId: creatorId,
       field: 'created',
@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
       newValue: null,
       eventType: 'assigned',
     });
-    res.status(201).json({ ...task, whatsappPreviews });
+    res.status(201).json({ ...task, whatsappMessages });
   } catch (err) {
     console.error('POST /api/tasks failed:', err);
     await client.query('ROLLBACK');
@@ -152,10 +152,10 @@ router.patch('/:id', async (req, res) => {
     // One activity-log entry (and one notification fan-out) per changed field —
     // status changes are what the spec calls out specifically, but every field
     // is logged the same way.
-    const whatsappPreviews = [];
+    const whatsappMessages = [];
     for (const [key, value] of Object.entries(fields)) {
       if (String(existing[key]) !== String(value)) {
-        const previews = await logActivityAndNotify({
+        const messages = await logActivityAndNotify({
           task: updated,
           userId: req.user.id,
           field: key,
@@ -163,7 +163,7 @@ router.patch('/:id', async (req, res) => {
           newValue: value,
           eventType: key === 'status' ? 'status_changed' : 'field_changed',
         });
-        whatsappPreviews.push(...previews);
+        whatsappMessages.push(...messages);
       }
     }
 
@@ -172,7 +172,7 @@ router.patch('/:id', async (req, res) => {
         previousAssigneeIds.length !== assignee_ids.length ||
         !previousAssigneeIds.every((uid) => assignee_ids.includes(uid));
       if (changed) {
-        const previews = await logActivityAndNotify({
+        const messages = await logActivityAndNotify({
           task: updated,
           userId: req.user.id,
           field: 'assignees',
@@ -180,7 +180,7 @@ router.patch('/:id', async (req, res) => {
           newValue: assignee_ids.join(','),
           eventType: 'assigned',
         });
-        whatsappPreviews.push(...previews);
+        whatsappMessages.push(...messages);
       }
     }
 
@@ -189,7 +189,7 @@ router.patch('/:id', async (req, res) => {
        JOIN users u ON u.id = ta.user_id WHERE ta.task_id = $1`,
       [id]
     );
-    res.json({ ...updated, assignees: assigneeRows, whatsappPreviews });
+    res.json({ ...updated, assignees: assigneeRows, whatsappMessages });
   } catch (err) {
     console.error('PATCH /api/tasks/:id failed:', err);
     await client.query('ROLLBACK');

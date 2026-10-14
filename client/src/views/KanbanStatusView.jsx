@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
-import { showWhatsAppPreview } from '../whatsappPreview.js';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
 
@@ -19,7 +18,6 @@ export default function KanbanStatusView() {
   async function moveTask(taskId, newStatus) {
     const updated = await api.updateTask(taskId, { status: newStatus });
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-    showWhatsAppPreview(updated.whatsappPreviews);
   }
 
   return (

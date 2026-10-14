@@ -5,7 +5,6 @@ import { api } from '../api.js';
 import TaskFormModal from './TaskFormModal.jsx';
 import SettingsMenu from './SettingsMenu.jsx';
 import AppSwitcher from './AppSwitcher.jsx';
-import { showWhatsAppPreview } from '../whatsappPreview.js';
 
 function inIframe() {
   try {
@@ -103,10 +102,7 @@ export default function Nav() {
       {showTaskForm && (
         <TaskFormModal
           onClose={() => setShowTaskForm(false)}
-          onCreated={(saved) => {
-            bumpRefresh();
-            showWhatsAppPreview(saved.whatsappPreviews);
-          }}
+          onCreated={() => bumpRefresh()}
         />
       )}
     </>

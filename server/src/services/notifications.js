@@ -1,5 +1,5 @@
 import { pool } from '../db.js';
-import { buildWhatsAppMessage } from './whatsapp.js';
+import { sendWhatsAppMessage } from './whatsapp.js';
 import { STATUS_LABELS, PRIORITY_LABELS, FIELD_LABELS } from '../labels.js';
 
 function formatFieldValue(field, value) {
@@ -19,8 +19,7 @@ function describeChange(field, oldValue, newValue) {
 // Writes to the activity log, then fans an in-app + WhatsApp notification out
 // to everyone "involved" in the task: its creator, its assignees, and anyone
 // already recorded as a watcher — minus whoever just made the change.
-// Returns the list of WhatsApp message previews that were built for this
-// event (see whatsapp.js — nothing is actually sent yet).
+// Returns the WhatsApp messages sent for this event (see whatsapp.js).
 export async function logActivityAndNotify({ task, userId, field, oldValue, newValue, eventType }) {
   await pool.query(
     `INSERT INTO task_activity_log (task_id, user_id, field, old_value, new_value)
@@ -41,21 +40,21 @@ export async function logActivityAndNotify({ task, userId, field, oldValue, newV
   if (task.created_by) recipientIds.add(task.created_by);
   recipientIds.delete(userId);
 
-  const previews = [];
+  const messages = [];
   for (const recipientId of recipientIds) {
     await pool.query(
       `INSERT INTO notifications (tenant_id, user_id, task_id, type, channel, payload)
        VALUES ($1, $2, $3, $4, 'in_app', $5)`,
       [task.tenant_id, recipientId, task.id, eventType, JSON.stringify({ field, oldValue, newValue })]
     );
-    const message = await buildWhatsAppMessage({
+    const message = await sendWhatsAppMessage({
       tenantId: task.tenant_id,
       userId: recipientId,
       eventType,
       task,
       extra: { changedByName, changeSummary },
     });
-    if (message) previews.push(message);
+    if (message) messages.push(message);
   }
-  return previews;
+  return messages;
 }

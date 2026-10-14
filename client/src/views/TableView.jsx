@@ -5,7 +5,6 @@ import { useAppContext } from '../context/AppContext.jsx';
 import AssigneePicker from '../components/AssigneePicker.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 import { formatDate } from '../utils.js';
-import { showWhatsAppPreview } from '../whatsappPreview.js';
 import PageFrame from '../components/PageFrame.jsx';
 
 // TODO: per-column filtering (the spec asks for sort + filter on every
@@ -32,12 +31,10 @@ export default function TableView() {
   async function updateAssignees(taskId, assigneeIds) {
     const updated = await api.updateTask(taskId, { assignee_ids: assigneeIds });
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-    showWhatsAppPreview(updated.whatsappPreviews);
   }
 
   function handleSaved(updated) {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    showWhatsAppPreview(updated.whatsappPreviews);
   }
 
   function handleDeleted(taskId) {

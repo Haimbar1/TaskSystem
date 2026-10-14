@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { buildWhatsAppMessage } from '../services/whatsapp.js';
+import { sendWhatsAppMessage } from '../services/whatsapp.js';
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.post('/check-overdue', async (req, res) => {
      WHERE due_date < CURRENT_DATE AND status NOT IN ('done', 'paused')`
   );
 
-  const whatsappPreviews = [];
+  const whatsappMessages = [];
   for (const task of overdueTasks) {
     const { rows: assignees } = await pool.query(
       'SELECT user_id FROM task_assignees WHERE task_id = $1',
@@ -28,22 +28,17 @@ router.post('/check-overdue', async (req, res) => {
          VALUES ($1, $2, $3, 'overdue_reminder', 'in_app', $4)`,
         [task.tenant_id, user_id, task.id, JSON.stringify({ due_date: task.due_date })]
       );
-      const message = await buildWhatsAppMessage({
+      const message = await sendWhatsAppMessage({
         tenantId: task.tenant_id,
         userId: user_id,
         eventType: 'overdue_reminder',
         task,
       });
-      if (message) {
-        // No user session to show a preview popup to here (n8n calls this,
-        // not a browser) — log it so it's still visible while unverified.
-        console.log('WhatsApp preview (overdue):', message);
-        whatsappPreviews.push(message);
-      }
+      if (message) whatsappMessages.push(message);
     }
   }
 
-  res.json({ checked: overdueTasks.length, whatsappPreviews });
+  res.json({ checked: overdueTasks.length, whatsappMessages });
 });
 
 export default router;

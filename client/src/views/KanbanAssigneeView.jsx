@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
-import { showWhatsAppPreview } from '../whatsappPreview.js';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
 
@@ -21,7 +20,6 @@ export default function KanbanAssigneeView() {
     const assignee_ids = userId === UNASSIGNED ? [] : [userId];
     const updated = await api.updateTask(taskId, { assignee_ids });
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-    showWhatsAppPreview(updated.whatsappPreviews);
   }
 
   const columns = [{ id: UNASSIGNED, name: 'לא משויך' }, ...users];

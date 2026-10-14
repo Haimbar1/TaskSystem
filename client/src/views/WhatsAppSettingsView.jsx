@@ -10,7 +10,6 @@ export default function WhatsAppSettingsView() {
   const [accessToken, setAccessToken] = useState('');
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
-  const [sendLive, setSendLive] = useState(false);
   const [linked, setLinked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -20,7 +19,6 @@ export default function WhatsAppSettingsView() {
       setTokenSet(s.whatsapp_access_token_set);
       setPhoneNumberId(s.whatsapp_phone_number_id);
       setWabaId(s.whatsapp_waba_id);
-      setSendLive(!!s.whatsapp_send_live);
       setLinked(!!s.linked);
     });
   }
@@ -36,12 +34,10 @@ export default function WhatsAppSettingsView() {
         whatsapp_access_token: accessToken,
         whatsapp_phone_number_id: phoneNumberId,
         whatsapp_waba_id: wabaId,
-        whatsapp_send_live: sendLive,
       });
       setTokenSet(s.whatsapp_access_token_set);
       setPhoneNumberId(s.whatsapp_phone_number_id);
       setWabaId(s.whatsapp_waba_id);
-      setSendLive(!!s.whatsapp_send_live);
       setAccessToken('');
       setMessage(
         !s.linked || s.vault?.ok
@@ -93,21 +89,10 @@ export default function WhatsAppSettingsView() {
             onChange={(e) => setWabaId(e.target.value)}
           />
         </div>
-        <label className="flex items-start gap-2 border rounded p-2 bg-gray-50">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={sendLive}
-            onChange={(e) => setSendLive(e.target.checked)}
-          />
-          <span className="text-sm">
-            <span className="font-medium">שליחה בפועל</span>
-            <span className="block text-gray-500">
-              כשכבוי — ההודעות רק מוצגות כתצוגה מקדימה ולא נשלחות. להדליק אחרי שהמזהים הוזנו והתבניות אושרו ב-Meta
-              למספר של העסק.
-            </span>
-          </span>
-        </label>
+        <p className="text-sm text-gray-500 border rounded p-2 bg-gray-50">
+          כשה-Access Token וה-Phone Number ID מוגדרים, עדכוני המשימות נשלחים בוואטסאפ מהמספר של העסק (בתבניות
+          המאושרות ב-Meta).
+        </p>
         <button
           type="submit"
           disabled={saving}

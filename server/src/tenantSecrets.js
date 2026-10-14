@@ -51,28 +51,14 @@ async function fetchFromPortal(portalTenantId) {
   }
 }
 
-// Per-business "send for real" switch (NULL = never set → the old WHATSAPP_SEND_LIVE env setting).
-let sendLiveColumn = null;
-export function ensureSendLiveColumn() {
-  if (!sendLiveColumn) {
-    sendLiveColumn = pool.query('ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_send_live BOOLEAN').catch((err) => {
-      sendLiveColumn = null;
-      throw err;
-    });
-  }
-  return sendLiveColumn;
-}
-
 // SELECT * so this works where portal_tenant_id hasn't been added yet (portalProvision.js).
 async function tenantRow(tenantId) {
-  await ensureSendLiveColumn();
   const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
   return rows[0] || {};
 }
 
 // The business's effective WhatsApp details: { whatsapp_access_token, whatsapp_phone_number_id,
-// whatsapp_waba_id } ('' = not set), plus where each came from (env / vault / local), and whether
-// this business sends for real (sendLive).
+// whatsapp_waba_id } ('' = not set), plus where each came from (env / vault / local).
 export async function whatsappCredentials(tenantId) {
   const row = await tenantRow(tenantId);
   const portalId = row.portal_tenant_id ? Number(row.portal_tenant_id) : null;
@@ -92,9 +78,7 @@ export async function whatsappCredentials(tenantId) {
       sources[f.column] = row[f.column] ? 'local' : '';
     }
   }
-  const sendLive =
-    row.whatsapp_send_live == null ? process.env.WHATSAPP_SEND_LIVE === 'true' : !!row.whatsapp_send_live;
-  return { values, sources, linked: !!portalId, sendLive };
+  return { values, sources, linked: !!portalId };
 }
 
 // Writes what the settings screen saved into the vault too, so the WhatsApp system / BotApp use the

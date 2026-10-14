@@ -3,7 +3,7 @@ import { pool } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
-import { whatsappCredentials, writeToVault, ensureSendLiveColumn } from '../tenantSecrets.js';
+import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 
 const router = Router();
 
@@ -60,12 +60,11 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res) => {
 // values and writes what's saved here into the vault too (and onto the tenants row, for a
 // business not linked to the portal). Access token is never sent back to the client in full.
 async function whatsappSettingsResponse(tenantId, extra = {}) {
-  const { values, sources, linked, sendLive } = await whatsappCredentials(tenantId);
+  const { values, sources, linked } = await whatsappCredentials(tenantId);
   return {
     whatsapp_access_token_set: !!values.whatsapp_access_token,
     whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
     whatsapp_waba_id: values.whatsapp_waba_id || '',
-    whatsapp_send_live: sendLive,
     sources,
     linked,
     ...extra,
@@ -77,22 +76,14 @@ router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin,
 });
 
 router.patch('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
-  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id, whatsapp_send_live } = req.body;
-  await ensureSendLiveColumn();
+  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id } = req.body;
   await pool.query(
     `UPDATE tenants SET
        whatsapp_access_token = COALESCE(NULLIF($1, ''), whatsapp_access_token),
        whatsapp_phone_number_id = $2,
-       whatsapp_waba_id = $3,
-       whatsapp_send_live = COALESCE($5, whatsapp_send_live)
+       whatsapp_waba_id = $3
      WHERE id = $4`,
-    [
-      whatsapp_access_token,
-      whatsapp_phone_number_id || '',
-      whatsapp_waba_id || '',
-      req.tenantId,
-      typeof whatsapp_send_live === 'boolean' ? whatsapp_send_live : null,
-    ]
+    [whatsapp_access_token, whatsapp_phone_number_id || '', whatsapp_waba_id || '', req.tenantId]
   );
   const vault = await writeToVault(
     req.tenantId,

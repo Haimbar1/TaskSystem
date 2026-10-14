@@ -6,29 +6,34 @@ import { whatsappCredentials } from '../tenantSecrets.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
-// Real sending is switched on per business ("שליחה בפועל" in the WhatsApp settings screen,
-// tenants.whatsapp_send_live). Until then every message is built and returned as a preview
-// (name + resolved {{n}} values) so the flow can be checked visually; switch it on once the
-// business's credentials are in and the templates are approved for its number. A business that
-// never touched the switch follows WHATSAPP_SEND_LIVE (the old platform-wide setting).
+// A business with WhatsApp details (token + Phone Number ID — the portal vault, see
+// tenantSecrets.js) sends every notification for real through the Meta Cloud API; a business
+// without them simply gets no WhatsApp messages.
 
-// Builds (and, only when the business sends for real, sends) the WhatsApp message for one
-// recipient/event. Returns null when there's nothing to send (no phone on
-// file, or no template for this event type) — otherwise the resolved
-// preview: { to, templateName, params, text, live }.
-export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
+// Meta wants the number in international form, digits only: 050-1234567 → 972501234567.
+function toWhatsAppNumber(phone) {
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (digits.startsWith('0')) return `972${digits.slice(1)}`;
+  return digits;
+}
+
+// Builds and sends the WhatsApp message for one recipient/event. Returns null when there's
+// nothing to send (no phone on file, no template for this event type, or the business has no
+// WhatsApp details) — otherwise what was sent: { to, templateName, params, text, sent }.
+export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
   const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
   const recipient = userRows[0];
   if (!recipient?.phone) return null;
 
-  // The portal vault's values (see tenantSecrets.js); only the original business falls back to env.
-  const { values: tenantCreds, sendLive } = await whatsappCredentials(tenantId);
-  const accessToken = tenantCreds.whatsapp_access_token;
-  const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
-  const live = sendLive && !!accessToken && !!phoneNumberId;
-
   const template = WHATSAPP_TEMPLATES[eventType];
   if (!template) return null;
+
+  // The portal vault's values (see tenantSecrets.js); only the original business falls back to env.
+  const { values: tenantCreds } = await whatsappCredentials(tenantId);
+  const accessToken = tenantCreds.whatsapp_access_token;
+  const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
+  if (!accessToken || !phoneNumberId) return null;
 
   const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/`; // TODO: per-task deep link once a task detail page exists
   const params = template.buildParams({
@@ -40,9 +45,15 @@ export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, 
     ...extra,
   });
 
-  const message = { to: recipient.phone, templateName: template.name, params, text: template.render(params), live };
+  const message = {
+    to: toWhatsAppNumber(recipient.phone),
+    templateName: template.name,
+    params,
+    text: template.render(params),
+    sent: false,
+  };
 
-  if (live) {
+  try {
     const res = await fetch(`${GRAPH_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
@@ -61,8 +72,13 @@ export async function buildWhatsAppMessage({ tenantId, userId, eventType, task, 
           ],
         },
       }),
+      signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) console.error('WhatsApp send failed', await res.text());
+    message.sent = res.ok;
+    if (!res.ok) console.error('WhatsApp send failed', message.to, message.templateName, await res.text());
+  } catch (err) {
+    // a WhatsApp outage must never fail the task save that triggered it
+    console.error('WhatsApp send failed', message.to, message.templateName, err?.message);
   }
 
   return message;

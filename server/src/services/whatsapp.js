@@ -20,7 +20,7 @@ function toWhatsAppNumber(phone) {
 
 // Builds and sends the WhatsApp message for one recipient/event. Returns null when there's
 // nothing to send (no phone on file, no template for this event type, or the business has no
-// WhatsApp details) — otherwise what was sent: { to, templateName, params, text, sent }.
+// WhatsApp details) — otherwise what was sent: { to, recipientName, templateName, params, text, sent }.
 export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
   const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
   const recipient = userRows[0];
@@ -47,6 +47,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
 
   const message = {
     to: toWhatsAppNumber(recipient.phone),
+    recipientName: recipient.name || '',
     templateName: template.name,
     params,
     text: template.render(params),

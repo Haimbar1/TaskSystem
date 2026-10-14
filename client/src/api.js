@@ -14,10 +14,21 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// Saving a task sends WhatsApp notifications server-side and returns them as `whatsappMessages`;
+// announce them so WhatsAppSentToast can tell the user who got one.
+function announceWhatsApp(task) {
+  if (task?.whatsappMessages?.length) {
+    window.dispatchEvent(new CustomEvent('whatsapp-sent', { detail: task.whatsappMessages }));
+  }
+  return task;
+}
+
 export const api = {
   getTasks: (params = {}) => request(`/api/tasks?${new URLSearchParams(params)}`),
-  createTask: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
-  updateTask: (id, data) => request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  createTask: (data) =>
+    request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }).then(announceWhatsApp),
+  updateTask: (id, data) =>
+    request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then(announceWhatsApp),
   deleteTask: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   getUsers: () => request('/api/users'),
   inviteUser: (data) => request('/api/users/invite', { method: 'POST', body: JSON.stringify(data) }),

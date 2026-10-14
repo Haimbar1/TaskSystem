@@ -9,6 +9,7 @@ import KanbanAssigneeView from './views/KanbanAssigneeView.jsx';
 import UsersView from './views/UsersView.jsx';
 import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
 import EmbedSettingsView from './views/EmbedSettingsView.jsx';
+import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
 
@@ -73,6 +74,7 @@ export default function App() {
           </Routes>
         </main>
       </div>
+      <WhatsAppSentToast />
     </AppProvider>
   );
 }

@@ -102,6 +102,32 @@ export default function WhatsAppSettingsView() {
         </button>
         {message && <span className="text-sm text-gray-600 mr-3">{message}</span>}
       </form>
+
+      {/* Mirrors server/src/services/notifications.js and routes/cronRoutes.js — keep in sync. */}
+      <div className="mt-5 border-t pt-4 text-sm space-y-2">
+        <h3 className="font-semibold">מתי ולמי נשלחות הודעות</h3>
+        <ul className="list-disc pr-5 space-y-1 text-gray-700">
+          <li>
+            <span className="font-medium">משימה חדשה</span> — לאחראים על המשימה (תבנית "הועברה לטיפולך").
+          </li>
+          <li>
+            <span className="font-medium">שינוי אחראים</span> — לכל המעורבים במשימה: מי שפתח אותה והאחראים עליה (תבנית
+            "הועברה לטיפולך").
+          </li>
+          <li>
+            <span className="font-medium">עדכון משימה</span> (סטטוס, עדיפות, כותרת, תיאור או תאריך יעד) — לכל המעורבים
+            במשימה, עם פירוט מה השתנה ומי שינה (תבנית "המשימה עודכנה").
+          </li>
+          <li>
+            <span className="font-medium">משימה באיחור</span> — בבדיקה האוטומטית, לאחראים על כל משימה שתאריך היעד שלה עבר
+            והיא לא במצב "בוצע" או "מושהה".
+          </li>
+        </ul>
+        <p className="text-gray-500">
+          מי שביצע את השינוי לא מקבל הודעה על עצמו, והודעות נשלחות רק למשתמשים שיש להם מספר טלפון. אחרי שמירת משימה
+          מופיעה הודעה קצרה בפינת המסך: למי נשלח וואטסאפ, ולמי השליחה נכשלה.
+        </p>
+      </div>
     </div>
   );
 }

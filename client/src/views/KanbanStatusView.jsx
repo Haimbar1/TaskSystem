@@ -4,6 +4,7 @@ import { STATUS_LABELS, STATUS_COLORS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
+import TaskFormModal from '../components/TaskFormModal.jsx';
 
 const STATUSES = Object.keys(STATUS_LABELS);
 
@@ -11,6 +12,7 @@ export default function KanbanStatusView() {
   const { refreshKey } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
+  const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
     api.getTasks().then(setTasks).catch(console.error);
@@ -35,7 +37,8 @@ export default function KanbanStatusView() {
   }
 
   return (
-    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה">
+    <>
+    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה">
       <div className="grid grid-cols-5 gap-3 items-start">
         {STATUSES.map((status) => {
           const colTasks = tasks.filter((t) => t.status === status);
@@ -61,6 +64,7 @@ export default function KanbanStatusView() {
                     task={t}
                     showAssignees
                     saving={savingIds.includes(t.id)}
+                    onOpen={() => setEditingTask(t)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />
                 ))}
@@ -70,5 +74,15 @@ export default function KanbanStatusView() {
         })}
       </div>
     </PageFrame>
+
+      {editingTask && (
+        <TaskFormModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={(updated) => setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))}
+          onDeleted={(taskId) => setTasks((prev) => prev.filter((t) => t.id !== taskId))}
+        />
+      )}
+    </>
   );
 }

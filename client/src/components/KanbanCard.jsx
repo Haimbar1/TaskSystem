@@ -2,11 +2,13 @@ import { PRIORITY_COLORS, PRIORITY_LABELS } from '../constants.js';
 
 // `saving`: the card was just moved and the server (which also sends the WhatsApp updates)
 // hasn't answered yet — it already sits in its new column, dimmed, and can't be dragged again.
-export default function KanbanCard({ task, onDragStart, showAssignees = false, saving = false }) {
+export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = false, saving = false }) {
   return (
     <div
       draggable={!saving}
       onDragStart={onDragStart}
+      onDoubleClick={saving ? undefined : onOpen}
+      title="גרירה להעברה, לחיצה כפולה לפתיחה"
       className={`bg-white border rounded-lg p-3 mb-2 shadow-sm transition-shadow space-y-2 ${
         saving ? 'opacity-60 cursor-wait border-emerald-300' : 'cursor-move hover:shadow-md'
       }`}

@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
+import TaskFormModal from '../components/TaskFormModal.jsx';
 
 const UNASSIGNED = '__unassigned__';
 
@@ -11,6 +12,7 @@ export default function KanbanAssigneeView() {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
+  const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
     api.getTasks().then(setTasks).catch(console.error);
@@ -42,7 +44,8 @@ export default function KanbanAssigneeView() {
   const columns = [{ id: UNASSIGNED, name: 'לא משויך' }, ...users];
 
   return (
-    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה">
+    <>
+    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה">
       <div className="grid gap-3 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
         {columns.map((col) => {
           const colTasks = tasks.filter((t) =>
@@ -72,6 +75,7 @@ export default function KanbanAssigneeView() {
                     key={t.id}
                     task={t}
                     saving={savingIds.includes(t.id)}
+                    onOpen={() => setEditingTask(t)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />
                 ))}
@@ -81,5 +85,15 @@ export default function KanbanAssigneeView() {
         })}
       </div>
     </PageFrame>
+
+      {editingTask && (
+        <TaskFormModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={(updated) => setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))}
+          onDeleted={(taskId) => setTasks((prev) => prev.filter((t) => t.id !== taskId))}
+        />
+      )}
+    </>
   );
 }

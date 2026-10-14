@@ -29,7 +29,7 @@ export default function WhatsAppSentToast() {
     <div
       dir="rtl"
       role="status"
-      className="fixed bottom-4 left-4 z-50 max-w-sm bg-white border rounded-lg shadow-lg p-3 text-sm space-y-1"
+      className="fixed top-16 right-4 z-50 max-w-sm bg-white border rounded-lg shadow-lg p-3 text-sm space-y-1"
     >
       {sent.length > 0 && (
         <div>

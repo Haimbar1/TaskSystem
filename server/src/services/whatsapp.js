@@ -4,6 +4,7 @@ import { STATUS_LABELS } from '../labels.js';
 import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
 import { recordMessage } from './whatsappLog.js';
+import { messageLink } from './messageLink.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
@@ -49,7 +50,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     return null;
   }
 
-  const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/`; // TODO: per-task deep link once a task detail page exists
+  const link = await messageLink(tenantId); // the business's app address (e.g. its Monday board); not per task
   const params = template.buildParams({
     recipientName: recipient.name || '',
     task,

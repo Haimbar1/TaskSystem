@@ -5,6 +5,7 @@ import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
+import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
 
 const router = Router();
 
@@ -66,6 +67,8 @@ async function whatsappSettingsResponse(tenantId, extra = {}) {
     whatsapp_access_token_set: !!values.whatsapp_access_token,
     whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
     whatsapp_waba_id: values.whatsapp_waba_id || '',
+    message_link_url: await getMessageLinkSetting(tenantId),
+    default_message_link: defaultMessageLink(),
     sources,
     linked,
     ...extra,
@@ -78,7 +81,11 @@ router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin,
 
 // Business admins can see the settings (GET above); only the platform owner changes them.
 router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
-  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id } = req.body;
+  const { whatsapp_access_token, whatsapp_phone_number_id, whatsapp_waba_id, message_link_url } = req.body;
+  if (message_link_url !== undefined) {
+    const linkError = await setMessageLinkSetting(req.tenantId, message_link_url);
+    if (linkError) return res.status(400).json({ error: linkError });
+  }
   await pool.query(
     `UPDATE tenants SET
        whatsapp_access_token = COALESCE(NULLIF($1, ''), whatsapp_access_token),

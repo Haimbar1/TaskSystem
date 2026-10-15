@@ -17,6 +17,8 @@ export default function WhatsAppSettingsView() {
   const [wabaId, setWabaId] = useState('');
   const [linked, setLinked] = useState(false);
   const [forwardUrl, setForwardUrl] = useState('');
+  const [messageLink, setMessageLink] = useState('');
+  const [defaultLink, setDefaultLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -28,6 +30,8 @@ export default function WhatsAppSettingsView() {
       setWabaId(s.whatsapp_waba_id);
       setLinked(!!s.linked);
       setForwardUrl(s.status_forward_url || '');
+      setMessageLink(s.message_link_url || '');
+      setDefaultLink(s.default_message_link || '');
     });
   }
 
@@ -49,10 +53,12 @@ export default function WhatsAppSettingsView() {
         whatsapp_access_token: accessToken,
         whatsapp_phone_number_id: phoneNumberId,
         whatsapp_waba_id: wabaId,
+        message_link_url: messageLink,
       });
       setTokenSet(s.whatsapp_access_token_set);
       setPhoneNumberId(s.whatsapp_phone_number_id);
       setWabaId(s.whatsapp_waba_id);
+      setMessageLink(s.message_link_url || '');
       setAccessToken('');
       setMessage(
         !s.linked || s.vault?.ok
@@ -60,7 +66,7 @@ export default function WhatsAppSettingsView() {
           : 'נשמר כאן, אבל השמירה בפורטל נכשלה — נסו שוב או עדכנו בפורטל ב"מזהים וחיבורים"'
       );
     } catch (err) {
-      setMessage('שגיאה בשמירה');
+      setMessage(err.message?.startsWith('API error') ? 'שגיאה בשמירה' : err.message || 'שגיאה בשמירה');
       console.error(err);
     } finally {
       setSaving(false);
@@ -118,6 +124,20 @@ export default function WhatsAppSettingsView() {
             value={wabaId}
             onChange={(e) => setWabaId(e.target.value)}
           />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">קישור למשימה בהודעות</label>
+          <input
+            dir="ltr"
+            placeholder={defaultLink}
+            className="border rounded p-2 w-full"
+            value={messageLink}
+            onChange={(e) => setMessageLink(e.target.value)}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            לעסק הזה בלבד. עסק שעובד מתוך Monday — הכתובת של הלוח שבו האפליקציה מוטמעת (למשל
+            https://xxx.monday.com/boards/…); מי שלא מחובר ל-Monday יתבקש להתחבר. ריק = הקישור של מערכת המשימות.
+          </p>
         </div>
         <p className="text-sm text-gray-500 border rounded p-2 bg-gray-50">
           כשה-Access Token וה-Phone Number ID מוגדרים, עדכוני המשימות נשלחים בוואטסאפ מהמספר של העסק (בתבניות

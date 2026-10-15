@@ -4,6 +4,7 @@ import { STATUS_LABELS } from '../labels.js';
 import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
 import { recordMessage } from './whatsappLog.js';
+import { taskLinkFor } from '../routes/openTaskRoutes.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
@@ -49,8 +50,8 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     return null;
   }
 
-  // Opens this task where the business works — its Monday board or this app (openTaskRoutes.js).
-  const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/api/open/${task.id}`;
+  // Opens this task: a 2-day signed link for a business that works through Monday, else a plain one.
+  const link = await taskLinkFor({ tenantId, taskId: task.id, userId });
   const params = template.buildParams({
     recipientName: recipient.name || '',
     task,

@@ -1,6 +1,9 @@
 export default function Login() {
   // set by the server when the portal gives this Google account no access to the task system
-  const noAccess = new URLSearchParams(window.location.search).get('loginError') === 'no-access';
+  const loginError = new URLSearchParams(window.location.search).get('loginError');
+  const noAccess = loginError === 'no-access';
+  // set by /api/open/s/<token> (server/src/routes/openTaskRoutes.js) for an expired WhatsApp task link
+  const linkExpired = loginError === 'link-expired';
   return (
     <div
       dir="rtl"
@@ -26,6 +29,11 @@ export default function Login() {
           </svg>
           התחברות עם Google
         </a>
+        {linkExpired && (
+          <p className="text-sm text-red-600">
+            הקישור למשימה פג תוקף (הוא תקף ליומיים). אפשר לפתוח את המשימה דרך Monday.
+          </p>
+        )}
         {noAccess && (
           <p className="text-sm text-red-600">
             לחשבון הזה אין גישה למערכת המשימות באף עסק בפורטל. מנהל העסק יכול לתת גישה ב-portal.smartesek.com.

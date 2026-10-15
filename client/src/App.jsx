@@ -11,6 +11,8 @@ import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
 import WhatsAppLogView from './views/WhatsAppLogView.jsx';
 import EmbedSettingsView from './views/EmbedSettingsView.jsx';
 import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
+import { HelpWidget } from './components/HelpWidget.tsx';
+import { helpFetch } from './api.js';
 import PendingTaskOpener from './components/PendingTaskOpener.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
@@ -81,6 +83,8 @@ export default function App() {
         </main>
       </div>
       <WhatsAppSentToast />
+      {/* The help assistant (asks the CRM's help service through /api/help) */}
+      <HelpWidget apiBase="/api/help" fetcher={helpFetch} />
       <PendingTaskOpener />
     </AppProvider>
   );

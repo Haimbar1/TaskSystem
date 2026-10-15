@@ -23,6 +23,9 @@ function announceWhatsApp(task) {
   return task;
 }
 
+// For the help assistant (components/HelpWidget.tsx): a plain fetch with this site's login cookie
+export const helpFetch = (path, init = {}) => fetch(`${API_URL}${path}`, { credentials: 'include', ...init });
+
 export const api = {
   getTasks: (params = {}) => request(`/api/tasks?${new URLSearchParams(params)}`),
   getPendingTask: () => request('/api/tasks/pending-open'),

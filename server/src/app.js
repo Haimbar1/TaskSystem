@@ -11,6 +11,7 @@ import cronRoutes from './routes/cronRoutes.js';
 import tenantRoutes from './routes/tenantRoutes.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
 import openTaskRoutes from './routes/openTaskRoutes.js';
+import helpRoutes from './routes/helpRoutes.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { requireTenant } from './middleware/tenant.js';
 import { dropStaleEmbedSession } from './embed.js';
@@ -23,7 +24,8 @@ export const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
-app.use(express.json());
+// (the help assistant can send a screenshot, a few MB)
+app.use(express.json({ limit: '5mb' }));
 const PgSessionStore = pgSession(session);
 
 app.use(
@@ -64,5 +66,7 @@ app.use('/api/whatsapp', whatsappWebhookRoutes);
 app.use('/api/open', openTaskRoutes);
 app.use('/api/tasks', requireAuth, requireTenant, taskRoutes);
 app.use('/api/users', requireAuth, requireTenant, userRoutes);
+// The help assistant (asks the CRM's help service — see routes/helpRoutes.js)
+app.use('/api/help', requireAuth, requireTenant, helpRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

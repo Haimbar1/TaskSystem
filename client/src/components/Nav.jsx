@@ -38,14 +38,14 @@ export default function Nav() {
       <nav className="bg-gradient-to-l from-teal-950 to-teal-900 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            {/* Embedded (shared business login): no portal identity to switch modules with,
-                and nothing in the settings menu applies — logging out would just strand the iframe. */}
-            {!user?.is_embed && (
-              <>
-                <AppSwitcher />
-                <SettingsMenu user={user} canManageUsers={canManageUsers} onLogout={handleLogout} />
-              </>
-            )}
+            {/* Embedded (shared business login): no portal identity to switch modules with. Its
+                gear has only what applies there (SettingsMenu), and no log out inside the iframe. */}
+            {!user?.is_embed && <AppSwitcher />}
+            <SettingsMenu
+              user={user}
+              canManageUsers={canManageUsers}
+              onLogout={showLogout ? handleLogout : null}
+            />
             <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold">
               מ
             </div>

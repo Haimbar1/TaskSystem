@@ -50,6 +50,10 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
   const itemClass = 'w-full text-right px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-sm';
   const sectionClass = 'px-2.5 pt-2 pb-0.5 text-[10px] font-bold text-gray-400';
   const hasAppItems = canManageUsers || user?.is_super_admin;
+  // Inside Monday (shared embed login): no portal, but the WhatsApp screens (read-only) and the
+  // business's people, who are managed here since they never log in through the portal.
+  const isEmbed = !!user?.is_embed;
+  const showWhatsApp = canManageUsers || isEmbed;
 
   return (
     <div ref={ref} className="relative">
@@ -62,7 +66,7 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-40 text-gray-900">
-          {canManageUsers && (
+          {canManageUsers && !isEmbed && (
             <a
               href={PORTAL_URL}
               target="_blank"
@@ -100,7 +104,7 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
             </>
           )}
 
-          {canManageUsers && (
+          {showWhatsApp && (
             <>
               <div className={sectionClass}>וואטסאפ ואינטגרציות</div>
               <button onClick={() => go('/whatsapp-settings')} className={itemClass}>
@@ -116,7 +120,7 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
               )}
               {/* Only for an embedded business (activeTenantHasEmbed is super-admin only): its
                   people never log in through the portal, so they're managed here. */}
-              {user?.activeTenantHasEmbed && (
+              {(user?.activeTenantHasEmbed || isEmbed) && (
                 <button onClick={() => go('/users')} className={itemClass}>
                   משתמשי העסק (Monday)
                 </button>
@@ -124,17 +128,20 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
             </>
           )}
 
-          <div className="border-t border-gray-100 mt-1.5 pt-1">
-            <button
-              onClick={() => {
-                setOpen(false);
-                onLogout();
-              }}
-              className={itemClass}
-            >
-              התנתקות
-            </button>
-          </div>
+          {/* No onLogout inside Monday's iframe: logging out there would strand it (Nav.jsx). */}
+          {onLogout && (
+            <div className="border-t border-gray-100 mt-1.5 pt-1">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onLogout();
+                }}
+                className={itemClass}
+              >
+                התנתקות
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

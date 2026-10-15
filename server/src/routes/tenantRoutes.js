@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
-import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
+import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '../embed.js';
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
@@ -19,6 +19,13 @@ function requireTenantAdmin(req, res, next) {
     return res.status(403).json({ error: 'Admins only' });
   }
   next();
+}
+
+// Read-only screens also open inside Monday: the embed login (one shared user per business, see
+// embed.js) gets the gear menu there, standing in for the business admin.
+function requireTenantAdminOrEmbed(req, res, next) {
+  if (isEmbedUser(req.user)) return next();
+  requireTenantAdmin(req, res, next);
 }
 
 // Creates a brand-new business plus its first admin user, who can then sign
@@ -75,7 +82,7 @@ async function whatsappSettingsResponse(tenantId, extra = {}) {
   };
 }
 
-router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
   res.json(await whatsappSettingsResponse(req.tenantId, { status_forward_url: statusForwardUrl(req) }));
 });
 
@@ -104,7 +111,7 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
 });
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
-router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
   res.json(await listMessages(req.tenantId));
 });
 

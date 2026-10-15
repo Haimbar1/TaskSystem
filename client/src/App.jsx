@@ -62,11 +62,11 @@ export default function App() {
             />
             <Route
               path="/whatsapp-settings"
-              element={canManageUsers ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
+              element={canManageUsers || user.is_embed ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/whatsapp-log"
-              element={canManageUsers ? <WhatsAppLogView /> : <Navigate to="/" replace />}
+              element={canManageUsers || user.is_embed ? <WhatsAppLogView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/embed-settings"

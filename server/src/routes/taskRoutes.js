@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { logActivityAndNotify } from '../services/notifications.js';
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
+import { takePendingTask } from './openTaskRoutes.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
@@ -10,12 +11,16 @@ const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'cr
 // TODO: per-column filtering beyond status/assignee (the table view needs it
 // on every column per the spec) — extend the WHERE-building below.
 router.get('/', async (req, res) => {
-  const { status, assignee, sort = 'created_at', dir = 'desc' } = req.query;
+  const { id, status, assignee, sort = 'created_at', dir = 'desc' } = req.query;
   const sortCol = SORTABLE.includes(sort) ? sort : 'created_at';
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const params = [req.tenantId];
   let where = 'WHERE t.tenant_id = $1';
+  if (id) {
+    params.push(id);
+    where += ` AND t.id = $${params.length}`;
+  }
   if (status) {
     params.push(status);
     where += ` AND t.status = $${params.length}`;
@@ -40,6 +45,14 @@ router.get('/', async (req, res) => {
     params
   );
   res.json(rows);
+});
+
+// The task a WhatsApp link asked to open (routes/openTaskRoutes.js), if it's in this business.
+router.get('/pending-open', async (req, res) => {
+  const taskId = takePendingTask(req, res);
+  if (!taskId) return res.json({ taskId: null });
+  const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [taskId, req.tenantId]);
+  res.json({ taskId: rows[0]?.id || null });
 });
 
 router.post('/', async (req, res) => {

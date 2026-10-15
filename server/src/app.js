@@ -10,6 +10,7 @@ import userRoutes from './routes/userRoutes.js';
 import cronRoutes from './routes/cronRoutes.js';
 import tenantRoutes from './routes/tenantRoutes.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
+import openTaskRoutes from './routes/openTaskRoutes.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { requireTenant } from './middleware/tenant.js';
 import { dropStaleEmbedSession } from './embed.js';
@@ -59,6 +60,8 @@ app.use('/api/tenants', tenantRoutes);
 app.use('/api/cron', cronRoutes);
 // Called by Meta (delivery statuses), not a logged-in user — see whatsappWebhookRoutes.js.
 app.use('/api/whatsapp', whatsappWebhookRoutes);
+// The task link in WhatsApp messages — no login; see openTaskRoutes.js.
+app.use('/api/open', openTaskRoutes);
 app.use('/api/tasks', requireAuth, requireTenant, taskRoutes);
 app.use('/api/users', requireAuth, requireTenant, userRoutes);
 

@@ -25,6 +25,7 @@ function announceWhatsApp(task) {
 
 export const api = {
   getTasks: (params = {}) => request(`/api/tasks?${new URLSearchParams(params)}`),
+  getPendingTask: () => request('/api/tasks/pending-open'),
   createTask: (data) =>
     request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }).then(announceWhatsApp),
   updateTask: (id, data) =>

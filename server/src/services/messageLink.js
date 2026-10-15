@@ -1,9 +1,11 @@
 import { pool } from '../db.js';
 
-// The "קישור למשימה" in a business's WhatsApp messages. A business that works inside Monday (the
-// app embedded in a board view, see embed.js) points it at that board, so the link opens the app
-// where its people already are — Monday asks them to log in if they aren't. Empty = the task
-// system itself (CLIENT_URL). Set by the platform owner on the "הגדרות וואטסאפ" screen.
+// Where a business works, for the "קישור למשימה" in its WhatsApp messages: the message links to
+// /api/open/<task> (routes/openTaskRoutes.js), which redirects here and the app opens the task. A
+// business that works inside Monday (the app embedded in a board view, see embed.js) sets its
+// board, so the task opens where its people already are — Monday asks them to log in if they
+// aren't. Empty = the task system itself (CLIENT_URL). Set by the platform owner on the
+// "הגדרות וואטסאפ" screen.
 
 let columnReady = false;
 async function ensureColumn() {

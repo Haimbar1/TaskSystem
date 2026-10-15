@@ -135,8 +135,9 @@ export default function WhatsAppSettingsView() {
             onChange={(e) => setMessageLink(e.target.value)}
           />
           <p className="text-xs text-gray-500 mt-1">
-            לעסק הזה בלבד. עסק שעובד מתוך Monday — הכתובת של הלוח שבו האפליקציה מוטמעת (למשל
-            https://xxx.monday.com/boards/…); מי שלא מחובר ל-Monday יתבקש להתחבר. ריק = הקישור של מערכת המשימות.
+            לעסק הזה בלבד. הקישור בהודעה פותח את המשימה עצמה בכתובת הזו. עסק שעובד מתוך Monday — הכתובת של הלוח
+            שבו האפליקציה מוטמעת (למשל https://xxx.monday.com/boards/…); מי שלא מחובר ל-Monday יתבקש להתחבר. ריק =
+            מערכת המשימות.
           </p>
         </div>
         <p className="text-sm text-gray-500 border rounded p-2 bg-gray-50">

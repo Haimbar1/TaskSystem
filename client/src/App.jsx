@@ -11,6 +11,7 @@ import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
 import WhatsAppLogView from './views/WhatsAppLogView.jsx';
 import EmbedSettingsView from './views/EmbedSettingsView.jsx';
 import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
+import PendingTaskOpener from './components/PendingTaskOpener.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
 
@@ -80,6 +81,7 @@ export default function App() {
         </main>
       </div>
       <WhatsAppSentToast />
+      <PendingTaskOpener />
     </AppProvider>
   );
 }

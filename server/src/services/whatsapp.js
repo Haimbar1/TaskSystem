@@ -3,6 +3,7 @@ import { WHATSAPP_TEMPLATES } from './whatsappTemplates.js';
 import { STATUS_LABELS } from '../labels.js';
 import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
+import { recordMessage } from './whatsappLog.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
@@ -18,14 +19,11 @@ function toWhatsAppNumber(phone) {
   return digits;
 }
 
-// Builds and sends the WhatsApp message for one recipient/event. Returns null when there's
-// nothing to send (no phone on file, no template for this event type, or the business has no
-// WhatsApp details) — otherwise what was sent: { to, recipientName, templateName, params, text, sent }.
+// Builds and sends the WhatsApp message for one recipient/event, and writes it to the outgoing log
+// (whatsappLog.js). Returns null when there's nothing to send (no template for this event type,
+// the business has no WhatsApp details, or no phone on file — that last one is still logged as
+// "not sent") — otherwise what was sent: { to, recipientName, templateName, params, text, sent }.
 export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
-  const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
-  const recipient = userRows[0];
-  if (!recipient?.phone) return null;
-
   const template = WHATSAPP_TEMPLATES[eventType];
   if (!template) return null;
 
@@ -34,6 +32,22 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
   const accessToken = tenantCreds.whatsapp_access_token;
   const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
   if (!accessToken || !phoneNumberId) return null;
+
+  const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
+  const recipient = userRows[0];
+  const logBase = {
+    tenantId,
+    taskId: task.id,
+    taskTitle: task.title,
+    userId,
+    recipientName: recipient?.name || '',
+    eventType,
+    templateName: template.name,
+  };
+  if (!recipient?.phone) {
+    await recordMessage({ ...logBase, status: 'skipped', error: 'אין מספר טלפון למשתמש' });
+    return null;
+  }
 
   const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/`; // TODO: per-task deep link once a task detail page exists
   const params = template.buildParams({
@@ -54,6 +68,8 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     sent: false,
   };
 
+  let wamid = null;
+  let error = null;
   try {
     const res = await fetch(`${GRAPH_API_URL}/${phoneNumberId}/messages`, {
       method: 'POST',
@@ -75,12 +91,30 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
       }),
       signal: AbortSignal.timeout(10000),
     });
+    const data = await res.json().catch(() => null);
     message.sent = res.ok;
-    if (!res.ok) console.error('WhatsApp send failed', message.to, message.templateName, await res.text());
+    // Meta's id for the message — accepted is not delivered; the status webhook reports that later.
+    if (res.ok) wamid = data?.messages?.[0]?.id || null;
+    else {
+      const e = data?.error;
+      error = e
+        ? [e.code && `(${e.code})`, e.error_user_msg || e.message, e.error_data?.details].filter(Boolean).join(' ')
+        : `HTTP ${res.status}`;
+      console.error('WhatsApp send failed', message.to, message.templateName, error);
+    }
   } catch (err) {
     // a WhatsApp outage must never fail the task save that triggered it
-    console.error('WhatsApp send failed', message.to, message.templateName, err?.message);
+    error = err?.message || 'network error';
+    console.error('WhatsApp send failed', message.to, message.templateName, error);
   }
 
+  await recordMessage({
+    ...logBase,
+    to: message.to,
+    text: message.text,
+    wamid,
+    status: message.sent ? 'accepted' : 'failed',
+    error,
+  });
   return message;
 }

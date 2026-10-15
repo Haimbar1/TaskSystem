@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken } from '../embed.js';
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
+import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
 
 const router = Router();
 
@@ -72,7 +73,7 @@ async function whatsappSettingsResponse(tenantId, extra = {}) {
 }
 
 router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
-  res.json(await whatsappSettingsResponse(req.tenantId));
+  res.json(await whatsappSettingsResponse(req.tenantId, { status_forward_url: statusForwardUrl(req) }));
 });
 
 // Business admins can see the settings (GET above); only the platform owner changes them.
@@ -93,6 +94,11 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   );
   if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
+});
+
+// The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
+router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  res.json(await listMessages(req.tenantId));
 });
 
 // The active business's embed token (embedding the app in e.g. Monday; see embed.js). Super admin

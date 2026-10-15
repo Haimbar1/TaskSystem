@@ -41,6 +41,7 @@ export const api = {
   getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
+  getWhatsAppLog: () => request('/api/tenants/whatsapp-log'),
   getEmbedToken: () => request('/api/tenants/embed-token'),
   rotateEmbedToken: () => request('/api/tenants/embed-token', { method: 'POST' }),
   clearEmbedToken: () => request('/api/tenants/embed-token', { method: 'DELETE' }),

@@ -8,6 +8,7 @@ import KanbanStatusView from './views/KanbanStatusView.jsx';
 import KanbanAssigneeView from './views/KanbanAssigneeView.jsx';
 import UsersView from './views/UsersView.jsx';
 import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
+import WhatsAppLogView from './views/WhatsAppLogView.jsx';
 import EmbedSettingsView from './views/EmbedSettingsView.jsx';
 import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
 import { AppProvider } from './context/AppContext.jsx';
@@ -62,6 +63,10 @@ export default function App() {
             <Route
               path="/whatsapp-settings"
               element={canManageUsers ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/whatsapp-log"
+              element={canManageUsers ? <WhatsAppLogView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/embed-settings"

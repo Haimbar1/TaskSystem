@@ -16,6 +16,8 @@ export default function WhatsAppSettingsView() {
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [linked, setLinked] = useState(false);
+  const [forwardUrl, setForwardUrl] = useState('');
+  const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -25,6 +27,14 @@ export default function WhatsAppSettingsView() {
       setPhoneNumberId(s.whatsapp_phone_number_id);
       setWabaId(s.whatsapp_waba_id);
       setLinked(!!s.linked);
+      setForwardUrl(s.status_forward_url || '');
+    });
+  }
+
+  function copyForwardUrl() {
+    navigator.clipboard?.writeText(forwardUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     });
   }
 
@@ -124,6 +134,28 @@ export default function WhatsAppSettingsView() {
       </form>
       )}
 
+      {/* Where n8n forwards Meta's delivery statuses (server/src/routes/whatsappWebhookRoutes.js). */}
+      {canEdit && forwardUrl && (
+        <div className="mt-5 border-t pt-4 text-sm space-y-2">
+          <h3 className="font-semibold">סטטוס מסירה ביומן ההודעות</h3>
+          <p className="text-gray-500">
+            ה-Webhook של Meta כבר מחובר ל-n8n (בהגדרות הוואטסאפ של מערכת ההודעות) — לא משנים אותו. כדי שביומן יופיע אם
+            הודעה נמסרה, נקראה או נכשלה, ה-workflow ב-n8n שמקבל את ה-Webhook מעביר את אותו גוף בקשה (POST, JSON) גם לכתובת
+            הזו. כתובת אחת לכל העסקים.
+          </p>
+          <div className="flex gap-2">
+            <input readOnly dir="ltr" value={forwardUrl} className="border rounded p-2 w-full bg-gray-50 text-xs" />
+            <button
+              type="button"
+              onClick={copyForwardUrl}
+              className="px-3 rounded-lg border text-xs text-gray-600 hover:bg-gray-100 whitespace-nowrap"
+            >
+              {copied ? 'הועתק' : 'העתק'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mirrors server/src/services/notifications.js and routes/cronRoutes.js — keep in sync. */}
       <div className="mt-5 border-t pt-4 text-sm space-y-2">
         <h3 className="font-semibold">מתי ולמי נשלחות הודעות</h3>
@@ -146,7 +178,8 @@ export default function WhatsAppSettingsView() {
         </ul>
         <p className="text-gray-500">
           מי שביצע את השינוי לא מקבל הודעה על עצמו, והודעות נשלחות רק למשתמשים שיש להם מספר טלפון. אחרי שמירת משימה
-          מופיעה הודעה קצרה בפינת המסך: למי נשלח וואטסאפ, ולמי השליחה נכשלה.
+          מופיעה הודעה קצרה בפינת המסך: למי נשלח וואטסאפ, ולמי השליחה נכשלה. כל ההודעות היוצאות ומה עלה בגורלן (נמסרה,
+          נקראה, נכשלה ולמה) מופיעות ב"יומן הודעות וואטסאפ" שבתפריט ההגדרות.
         </p>
       </div>
     </div>

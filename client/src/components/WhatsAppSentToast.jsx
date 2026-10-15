@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-// Short notice after saving a task: which people just got a WhatsApp message about it (and
-// whose message failed). Fed by api.js's 'whatsapp-sent' event; disappears on its own.
+// Short notice after saving a task: whose WhatsApp message Meta accepted (and whose it refused).
+// Accepted is not delivered — Meta reports delivery later, only through a webhook. Fed by api.js's 'whatsapp-sent' event; disappears on its own.
 export default function WhatsAppSentToast() {
   const [messages, setMessages] = useState(null);
 
@@ -33,7 +33,7 @@ export default function WhatsAppSentToast() {
     >
       {sent.length > 0 && (
         <div>
-          <span className="text-emerald-700 font-medium">נשלחה הודעת וואטסאפ אל: </span>
+          <span className="text-emerald-700 font-medium">הודעת וואטסאפ נשלחה ל-Meta עבור: </span>
           {names(sent)}
         </div>
       )}

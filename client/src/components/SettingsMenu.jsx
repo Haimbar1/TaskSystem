@@ -106,6 +106,9 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
               <button onClick={() => go('/whatsapp-settings')} className={itemClass}>
                 הגדרות וואטסאפ
               </button>
+              <button onClick={() => go('/whatsapp-log')} className={itemClass}>
+                יומן הודעות וואטסאפ
+              </button>
               {user?.is_super_admin && (
                 <button onClick={() => go('/embed-settings')} className={itemClass}>
                   הטמעה ב-Monday

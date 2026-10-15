@@ -29,7 +29,9 @@ interface Turn {
 interface Props {
   apiBase: string; // e.g. "/api/help" — this system's own server, which forwards to the CRM
   fetcher?: Fetcher; // adds this system's login headers (default: window.fetch)
+  title?: string; // a system with its own assistant (e.g. the tasks system) names it
   subtitle?: string;
+  welcome?: string; // the first message
   buttonClassName?: string; // position of the floating button (fixed ...)
   panelBottomClassName?: string; // how high the open panel sits (just above the button)
   accent?: 'blue' | 'green';
@@ -121,7 +123,7 @@ function clickableOf(el: Element): Element {
 // closest in length; then the smallest. Ignores the assistant itself.
 function findByText(text: string): Element | null {
   const want = clean(text);
-  if (!norm(want)) return null;
+  if (!want) return null;
   let best: { el: Element; score: number; extra: number; area: number } | null = null;
   const consider = (el: Element, label: string) => {
     const got = clean(label);
@@ -133,7 +135,8 @@ function findByText(text: string): Element | null {
     const b = best as typeof cand | null;
     if (!b || cand.score > b.score || (cand.score === b.score && (cand.extra < b.extra || (cand.extra === b.extra && cand.area < b.area)))) best = cand;
   };
-  const probe = norm(want).slice(0, 3);
+  // (a button that is only an icon, like "⚙️", is looked for by the icon itself)
+  const probe = norm(want).slice(0, 3) || want.slice(0, 2);
   for (const el of Array.from(document.body.querySelectorAll('*'))) {
     if (el instanceof HTMLElement || el instanceof SVGElement) {
       const t = el.textContent || '';
@@ -365,7 +368,9 @@ const defaultFetcher: Fetcher = (url, init) => fetch(url, init);
 export function HelpWidget({
   apiBase,
   fetcher = defaultFetcher,
+  title = 'העוזר',
   subtitle = 'איך עושים את זה? — כל המערכות של עסק חכם',
+  welcome = 'שלום! אני כאן כדי להסביר איך עושים כל דבר במערכות של עסק חכם — ה-CRM, הוואטסאפ וההודעות, הבוט, המשימות והפורטל. כתבו שאלה במילים שלכם, צרפו צילום מסך של מה שאתם רואים (📎), או בחרו שאלה:',
   buttonClassName = 'fixed bottom-4 right-4',
   panelBottomClassName = 'bottom-20',
   accent = 'blue',
@@ -471,7 +476,7 @@ export function HelpWidget({
             <div className="flex items-center gap-2">
               <IconHelp />
               <div>
-                <div className="font-bold leading-tight">העוזר</div>
+                <div className="font-bold leading-tight">{title}</div>
                 <div className="text-[10px] text-white/75 leading-tight">{subtitle}</div>
               </div>
             </div>
@@ -548,9 +553,7 @@ export function HelpWidget({
             {(showMenu || turns.length === 0) && (
               <div className="space-y-3">
                 {turns.length === 0 && (
-                  <div className="text-xs text-gray-600 leading-relaxed">
-                    שלום! אני כאן כדי להסביר איך עושים כל דבר במערכות של עסק חכם — ה-CRM, הוואטסאפ וההודעות, הבוט, המשימות והפורטל. כתבו שאלה במילים שלכם, צרפו צילום מסך של מה שאתם רואים (📎), או בחרו שאלה:
-                  </div>
+                  <div className="text-xs text-gray-600 leading-relaxed">{welcome}</div>
                 )}
                 {groups === null ? (
                   <div className="text-xs text-gray-400 flex items-center gap-2">
@@ -636,7 +639,7 @@ export function HelpWidget({
         type="button"
         data-help-ui
         onClick={() => setOpen((v) => !v)}
-        title="העוזר — איך עושים את זה?"
+        title={`${title} — איך עושים את זה?`}
         className={`${buttonClassName} z-[9990] w-12 h-12 rounded-full ${t.bg} ${t.hover} text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105 cursor-pointer`}
       >
         {open ? <IconX className="w-5 h-5" /> : <IconHelp className="w-6 h-6" />}

@@ -84,7 +84,13 @@ export default function App() {
       </div>
       <WhatsAppSentToast />
       {/* The help assistant (asks the CRM's help service through /api/help) */}
-      <HelpWidget apiBase="/api/help" fetcher={helpFetch} />
+      <HelpWidget
+        apiBase="/api/help"
+        fetcher={helpFetch}
+        title="העוזר של מערכת המשימות"
+        subtitle="איך עושים את זה במערכת המשימות?"
+        welcome="שלום! אני העוזר של מערכת המשימות — אסביר איך יוצרים משימה, משייכים אחראים, משנים סטטוס בקנבן, ומתי נשלחות הודעות וואטסאפ. כתבו שאלה, צרפו צילום מסך (📎), או בחרו שאלה:"
+      />
       <PendingTaskOpener />
     </AppProvider>
   );

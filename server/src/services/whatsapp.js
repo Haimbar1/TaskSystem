@@ -34,8 +34,11 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
   const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
   if (!accessToken || !phoneNumberId) return null;
 
-  const { rows: userRows } = await pool.query('SELECT name, phone FROM users WHERE id = $1', [userId]);
+  const { rows: userRows } = await pool.query('SELECT name, phone, tenant_id FROM users WHERE id = $1', [userId]);
   const recipient = userRows[0];
+  // Only the business's own people: the platform owner working inside another business (e.g. as
+  // the creator of its tasks) gets no WhatsApp about it.
+  if (recipient && recipient.tenant_id !== tenantId) return null;
   const logBase = {
     tenantId,
     taskId: task.id,

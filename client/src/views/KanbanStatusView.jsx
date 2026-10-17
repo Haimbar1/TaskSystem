@@ -4,17 +4,19 @@ import { STATUS_COLOR_OPTIONS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
+import TaskFilters from '../components/TaskFilters.jsx';
+import { filterParams } from '../taskFilters.js';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 
 export default function KanbanStatusView() {
-  const { refreshKey, statuses } = useAppContext();
+  const { refreshKey, statuses, filters } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
-    api.getTasks().then(setTasks).catch(console.error);
-  }, [refreshKey]);
+    api.getTasks(filterParams(filters)).then(setTasks).catch(console.error);
+  }, [refreshKey, filters]);
 
   // The card moves at once (the save also sends WhatsApp, which takes a moment) and shows that
   // it's saving; if the save fails it goes back to its old column.
@@ -38,7 +40,7 @@ export default function KanbanStatusView() {
 
   return (
     <>
-    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה">
+    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה" actions={<TaskFilters />}>
       {/* One column per status of the business, in its order; scrolls sideways when there are many. */}
       <div
         className="grid gap-3 items-start overflow-x-auto"

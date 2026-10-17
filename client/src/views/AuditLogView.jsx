@@ -7,6 +7,7 @@ const ACTION = {
   task_created: 'משימה נוצרה',
   task_updated: 'משימה עודכנה',
   task_deleted: 'משימה נמחקה',
+  note_added: 'הערה נוספה',
   statuses_changed: 'סטטוסים עודכנו',
   settings_changed: 'הגדרות עודכנו',
   user_added: 'משתמש נוסף',

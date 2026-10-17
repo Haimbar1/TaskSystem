@@ -3,19 +3,24 @@ import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
+import TaskFilters from '../components/TaskFilters.jsx';
+import { filterParams } from '../taskFilters.js';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 
 const UNASSIGNED = '__unassigned__';
 
 export default function KanbanAssigneeView() {
-  const { refreshKey } = useAppContext();
+  const { refreshKey, filters } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
-    api.getTasks().then(setTasks).catch(console.error);
+    api.getTasks(filterParams(filters)).then(setTasks).catch(console.error);
+  }, [refreshKey, filters]);
+
+  useEffect(() => {
     api.getUsers().then(setUsers).catch(console.error);
   }, [refreshKey]);
 
@@ -45,7 +50,7 @@ export default function KanbanAssigneeView() {
 
   return (
     <>
-    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה">
+    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה" actions={<TaskFilters />}>
       <div className="grid gap-3 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
         {columns.map((col) => {
           const colTasks = tasks.filter((t) =>

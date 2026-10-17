@@ -5,6 +5,7 @@ import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 import { takePendingTask } from './openTaskRoutes.js';
 import { getStatuses, finalKeys } from '../services/taskStatuses.js';
 import { actorFor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
+import { listNotes, addNote } from '../services/taskNotes.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
@@ -26,7 +27,7 @@ function sameValue(stored, sent) {
 // TODO: per-column filtering beyond status/assignee (the table view needs it
 // on every column per the spec) — extend the WHERE-building below.
 router.get('/', async (req, res) => {
-  const { id, status, assignee, sort = 'created_at', dir = 'desc' } = req.query;
+  const { id, status, assignee, q, date_field, from, to, sort = 'created_at', dir = 'desc' } = req.query;
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const params = [req.tenantId];
@@ -48,6 +49,27 @@ router.get('/', async (req, res) => {
   if (assignee) {
     params.push(assignee);
     where += ` AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $${params.length})`;
+  }
+  // The search bar (components/TaskFilters.jsx): words in the title or description…
+  const text = String(q || '').trim();
+  if (text) {
+    params.push(`%${text.replace(/[\\%_]/g, '\\$&')}%`);
+    where += ` AND (t.title ILIKE $${params.length} OR t.description ILIKE $${params.length})`;
+  }
+  // …and a period (inclusive days, Israel time) on the chosen date.
+  const dateCol = {
+    due_date: 't.due_date',
+    created_at: "(t.created_at AT TIME ZONE 'Asia/Jerusalem')::date",
+    completed_at: "(t.completed_at AT TIME ZONE 'Asia/Jerusalem')::date",
+  }[date_field] || 't.due_date';
+  const isDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+  if (isDay(from)) {
+    params.push(from);
+    where += ` AND ${dateCol} >= $${params.length}::date`;
+  }
+  if (isDay(to)) {
+    params.push(to);
+    where += ` AND ${dateCol} <= $${params.length}::date`;
   }
 
   const { rows } = await pool.query(
@@ -73,6 +95,32 @@ router.get('/pending-open', async (req, res) => {
   if (!taskId) return res.json({ taskId: null });
   const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [taskId, req.tenantId]);
   res.json({ taskId: rows[0]?.id || null });
+});
+
+// The task's notes ("הערות ביצוע"), oldest first; see services/taskNotes.js.
+router.get('/:id/notes', async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(await listNotes(rows[0].id));
+});
+
+// Adds a note signed by whoever is acting (inside Monday: the one picked in "מי את/ה?").
+router.post('/:id/notes', async (req, res) => {
+  const body = String(req.body?.body ?? '').trim();
+  if (!body) return res.status(400).json({ error: 'ההערה ריקה' });
+  const { rows } = await pool.query('SELECT id, title FROM tasks WHERE id = $1 AND tenant_id = $2', [
+    req.params.id,
+    req.tenantId,
+  ]);
+  const task = rows[0];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  req.actor = await actorFor(req);
+  if (req.actor.viaMonday && !req.actor.userId) {
+    return res.status(400).json({ error: 'יש לבחור למעלה "מי את/ה?" כדי שיהיה ידוע מי כתב את ההערה' });
+  }
+  const note = await addNote(task.id, req.actor, body);
+  await recordAction(req, { action: 'note_added', task, details: body.length > 80 ? `${body.slice(0, 80)}…` : body });
+  res.status(201).json(note);
 });
 
 router.post('/', async (req, res) => {

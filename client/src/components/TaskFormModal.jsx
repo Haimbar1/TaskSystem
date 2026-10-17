@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext.jsx';
 import { PRIORITY_LABELS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
+import TaskNotes from './TaskNotes.jsx';
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
@@ -90,8 +91,11 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <form onSubmit={handleSubmit} className="bg-white rounded p-4 w-full max-w-md space-y-3">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded p-4 w-full max-w-2xl space-y-3 max-h-[92vh] overflow-y-auto"
+      >
         <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
 
         {needsCreator && (
@@ -125,7 +129,8 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         <div>
           <label className="block text-sm mb-1">תיאור</label>
           <textarea
-            className="w-full border rounded p-2"
+            className="w-full border rounded p-2 resize-y"
+            rows={6}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -178,6 +183,12 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             </div>
           )}
         </div>
+
+        {isEdit ? (
+          <TaskNotes taskId={task.id} />
+        ) : (
+          <p className="text-xs text-gray-400">הערות ביצוע אפשר להוסיף אחרי יצירת המשימה.</p>
+        )}
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 

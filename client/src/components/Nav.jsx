@@ -47,9 +47,8 @@ export default function Nav() {
               canManageUsers={canManageUsers}
               onLogout={showLogout ? handleLogout : null}
             />
-            <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold">
-              מ
-            </div>
+            {/* The site's favicon (client/public/favicon.svg) doubles as the logo. */}
+            <img src="/favicon.svg" alt="" className="w-9 h-9" />
             <div className="hidden sm:block">
               <div className="font-bold leading-tight">מערכת ניהול משימות</div>
               {user?.activeTenantName && (

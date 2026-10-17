@@ -6,19 +6,21 @@ import AssigneePicker from '../components/AssigneePicker.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 import { formatDate } from '../utils.js';
 import PageFrame from '../components/PageFrame.jsx';
+import TaskFilters from '../components/TaskFilters.jsx';
+import { filterParams } from '../taskFilters.js';
 
 // TODO: per-column filtering (the spec asks for sort + filter on every
 // column) — only sorting is wired up so far.
 export default function TableView() {
-  const { refreshKey, statusLabel } = useAppContext();
+  const { refreshKey, statusLabel, filters } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [sort, setSort] = useState({ col: 'created_at', dir: 'desc' });
   const [editingTask, setEditingTask] = useState(null);
 
   useEffect(() => {
-    api.getTasks({ sort: sort.col, dir: sort.dir }).then(setTasks).catch(console.error);
-  }, [sort, refreshKey]);
+    api.getTasks({ sort: sort.col, dir: sort.dir, ...filterParams(filters) }).then(setTasks).catch(console.error);
+  }, [sort, refreshKey, filters]);
 
   useEffect(() => {
     api.getUsers().then(setUsers).catch(console.error);
@@ -63,7 +65,7 @@ export default function TableView() {
 
   return (
     <>
-      <PageFrame title="כל המשימות" subtitle={`${tasks.length} משימות`}>
+      <PageFrame title="כל המשימות" subtitle={`${tasks.length} משימות`} actions={<TaskFilters />}>
       <table className="w-full">
         <thead>
           <tr>

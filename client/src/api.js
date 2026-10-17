@@ -41,6 +41,8 @@ export const api = {
   updateTask: (id, data) =>
     request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then(announceWhatsApp),
   deleteTask: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
+  getTaskNotes: (id) => request(`/api/tasks/${id}/notes`),
+  addTaskNote: (id, body) => request(`/api/tasks/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
   getUsers: () => request('/api/users'),
   inviteUser: (data) => request('/api/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

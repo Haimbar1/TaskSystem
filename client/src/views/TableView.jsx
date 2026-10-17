@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { STATUS_LABELS, PRIORITY_LABELS } from '../constants.js';
+import { PRIORITY_LABELS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import AssigneePicker from '../components/AssigneePicker.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
@@ -10,7 +10,7 @@ import PageFrame from '../components/PageFrame.jsx';
 // TODO: per-column filtering (the spec asks for sort + filter on every
 // column) — only sorting is wired up so far.
 export default function TableView() {
-  const { refreshKey } = useAppContext();
+  const { refreshKey, statusLabel } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [sort, setSort] = useState({ col: 'created_at', dir: 'desc' });
@@ -89,7 +89,7 @@ export default function TableView() {
               </td>
               <td className="p-2">{PRIORITY_LABELS[t.priority]}</td>
               <td className="p-2">{formatDate(t.due_date)}</td>
-              <td className="p-2">{STATUS_LABELS[t.status]}</td>
+              <td className="p-2">{statusLabel(t.status)}</td>
               <td className="p-2">
                 <AssigneePicker
                   users={users}

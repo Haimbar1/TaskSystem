@@ -81,6 +81,11 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
 
           {/* Users and new businesses are managed in the portal (link above), not here. */}
           {hasAppItems && <div className={sectionClass}>הגדרות האפליקציה</div>}
+          {canManageUsers && (
+            <button onClick={() => go('/status-settings')} className={itemClass}>
+              סטטוסים של משימות
+            </button>
+          )}
           {user?.is_super_admin && (
             <>
               <div className="px-2.5 pt-1">

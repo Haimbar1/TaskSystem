@@ -1,6 +1,6 @@
 import { pool } from '../db.js';
 import { WHATSAPP_TEMPLATES } from './whatsappTemplates.js';
-import { STATUS_LABELS } from '../labels.js';
+import { getStatuses, statusLabel } from './taskStatuses.js';
 import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
 import { recordMessage } from './whatsappLog.js';
@@ -59,7 +59,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     recipientName: recipient.name || '',
     task,
     dueDate: formatDate(task.due_date),
-    statusLabel: STATUS_LABELS[task.status] || task.status,
+    statusLabel: statusLabel(await getStatuses(tenantId), task.status),
     link,
     ...extra,
   });

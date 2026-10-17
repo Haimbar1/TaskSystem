@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { logActivityAndNotify } from '../services/notifications.js';
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 import { takePendingTask } from './openTaskRoutes.js';
+import { getStatuses, finalKeys } from '../services/taskStatuses.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
@@ -12,10 +13,15 @@ const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'cr
 // on every column per the spec) — extend the WHERE-building below.
 router.get('/', async (req, res) => {
   const { id, status, assignee, sort = 'created_at', dir = 'desc' } = req.query;
-  const sortCol = SORTABLE.includes(sort) ? sort : 'created_at';
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const params = [req.tenantId];
+  let sortCol = SORTABLE.includes(sort) ? sort : 'created_at';
+  // By the business's own status order (the Kanban columns), not alphabetically.
+  if (sortCol === 'status') {
+    params.push((await getStatuses(req.tenantId)).map((s) => s.key));
+    sortCol = `array_position($${params.length}::text[], t.status)`;
+  }
   let where = 'WHERE t.tenant_id = $1';
   if (id) {
     params.push(id);
@@ -70,13 +76,16 @@ router.post('/', async (req, res) => {
     creatorId = rows[0].id;
   }
 
+  // New tasks open in the business's first status (never an ending one, see taskStatuses.js).
+  const [firstStatus] = await getStatuses(req.tenantId);
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `INSERT INTO tasks (tenant_id, title, description, priority, due_date, created_by, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'new') RETURNING *`,
-      [req.tenantId, title, description, priority, due_date, creatorId]
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.tenantId, title, description, priority, due_date, creatorId, firstStatus.key]
     );
     const task = rows[0];
     for (const userId of assignee_ids) {
@@ -116,6 +125,13 @@ router.patch('/:id', async (req, res) => {
   const existing = existingRows[0];
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
+  let finals = null;
+  if (fields.status !== undefined) {
+    const statuses = await getStatuses(req.tenantId);
+    if (!statuses.some((s) => s.key === fields.status)) return res.status(400).json({ error: 'Unknown status' });
+    finals = finalKeys(statuses);
+  }
+
   const client = await pool.connect();
   let updated = existing;
   try {
@@ -130,8 +146,11 @@ router.patch('/:id', async (req, res) => {
         params.push(value);
         i++;
       }
-      if (fields.status === 'done' && existing.status !== 'done') {
-        updates.push('completed_at = now()');
+      // Completed = in an ending status (בוצע, נדחה…). Moving into one stamps the date; being in
+      // any other status clears it, even if the task was completed before.
+      if (finals) {
+        if (!finals.includes(fields.status)) updates.push('completed_at = NULL');
+        else if (!finals.includes(existing.status) || !existing.completed_at) updates.push('completed_at = now()');
       }
       params.push(id, req.tenantId);
 

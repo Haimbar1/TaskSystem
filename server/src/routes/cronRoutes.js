@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { sendWhatsAppMessage } from '../services/whatsapp.js';
+import { ensureStatusSchema, DEFAULT_STATUSES } from '../services/taskStatuses.js';
 
 const router = Router();
 
@@ -11,9 +12,16 @@ router.post('/check-overdue', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // Not for completed tasks (any ending status of the business, see taskStatuses.js) or paused ones.
+  await ensureStatusSchema();
   const { rows: overdueTasks } = await pool.query(
-    `SELECT * FROM tasks
-     WHERE due_date < CURRENT_DATE AND status NOT IN ('done', 'paused')`
+    `SELECT t.* FROM tasks t JOIN tenants tn ON tn.id = t.tenant_id
+     WHERE t.due_date < CURRENT_DATE AND t.status <> 'paused'
+       AND t.status NOT IN (
+         SELECT s->>'key' FROM jsonb_array_elements(COALESCE(tn.task_statuses, $1::jsonb)) s
+         WHERE (s->>'is_final')::boolean
+       )`,
+    [JSON.stringify(DEFAULT_STATUSES)]
   );
 
   const whatsappMessages = [];

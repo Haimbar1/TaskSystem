@@ -10,6 +10,7 @@ import UsersView from './views/UsersView.jsx';
 import WhatsAppSettingsView from './views/WhatsAppSettingsView.jsx';
 import WhatsAppLogView from './views/WhatsAppLogView.jsx';
 import EmbedSettingsView from './views/EmbedSettingsView.jsx';
+import StatusSettingsView from './views/StatusSettingsView.jsx';
 import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
 import { HelpWidget } from './components/HelpWidget.tsx';
 import { helpFetch } from './api.js';
@@ -70,6 +71,10 @@ export default function App() {
             <Route
               path="/whatsapp-log"
               element={canManageUsers || user.is_embed ? <WhatsAppLogView /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/status-settings"
+              element={canManageUsers ? <StatusSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/embed-settings"

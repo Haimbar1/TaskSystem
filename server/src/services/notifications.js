@@ -1,19 +1,20 @@
 import { pool } from '../db.js';
 import { sendWhatsAppMessage } from './whatsapp.js';
-import { STATUS_LABELS, PRIORITY_LABELS, FIELD_LABELS } from '../labels.js';
+import { PRIORITY_LABELS, FIELD_LABELS } from '../labels.js';
+import { getStatuses, statusLabel } from './taskStatuses.js';
 
-function formatFieldValue(field, value) {
+async function formatFieldValue(tenantId, field, value) {
   if (value == null || value === '') return '—';
-  if (field === 'status') return STATUS_LABELS[value] || value;
+  if (field === 'status') return statusLabel(await getStatuses(tenantId), value);
   if (field === 'priority') return PRIORITY_LABELS[value] || value;
   return String(value);
 }
 
-function describeChange(field, oldValue, newValue) {
+async function describeChange(tenantId, field, oldValue, newValue) {
   if (field === 'created') return 'המשימה נוצרה';
   if (field === 'assignees') return 'האחראים על המשימה עודכנו';
   const label = FIELD_LABELS[field] || field;
-  return `${label} עודכן ל"${formatFieldValue(field, newValue)}"`;
+  return `${label} עודכן ל"${await formatFieldValue(tenantId, field, newValue)}"`;
 }
 
 // Writes to the activity log, then fans an in-app + WhatsApp notification out
@@ -29,7 +30,7 @@ export async function logActivityAndNotify({ task, userId, field, oldValue, newV
 
   const { rows: actorRows } = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
   const changedByName = actorRows[0]?.name || 'מישהו';
-  const changeSummary = describeChange(field, oldValue, newValue);
+  const changeSummary = await describeChange(task.tenant_id, field, oldValue, newValue);
 
   const { rows: involvedRows } = await pool.query(
     `SELECT user_id FROM task_assignees WHERE task_id = $1

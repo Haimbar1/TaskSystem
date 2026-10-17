@@ -5,6 +5,7 @@ import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '../embed.js';
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
+import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
 
 const router = Router();
@@ -108,6 +109,18 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   );
   if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
+});
+
+// The active business's task statuses (services/taskStatuses.js). Everyone needs them for the
+// board; only the business's admins change them.
+router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {
+  res.json({ statuses: await getStatuses(req.tenantId), colors: STATUS_COLORS });
+});
+
+router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  const result = await setStatuses(req.tenantId, req.body?.statuses);
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ statuses: result.statuses, colors: STATUS_COLORS });
 });
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).

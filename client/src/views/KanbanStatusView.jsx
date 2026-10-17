@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { STATUS_LABELS, STATUS_COLORS } from '../constants.js';
+import { STATUS_COLOR_OPTIONS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import KanbanCard from '../components/KanbanCard.jsx';
 import PageFrame from '../components/PageFrame.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 
-const STATUSES = Object.keys(STATUS_LABELS);
-
 export default function KanbanStatusView() {
-  const { refreshKey } = useAppContext();
+  const { refreshKey, statuses } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
@@ -26,7 +24,9 @@ export default function KanbanStatusView() {
     setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, status: newStatus } : t)));
     setSavingIds((ids) => [...ids, before.id]);
     try {
-      await api.updateTask(before.id, { status: newStatus });
+      // The answer carries the completion date the server set or cleared.
+      const updated = await api.updateTask(before.id, { status: newStatus });
+      setTasks((prev) => prev.map((t) => (t.id === before.id ? updated : t)));
     } catch (err) {
       console.error(err);
       setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, status: before.status } : t)));
@@ -39,21 +39,28 @@ export default function KanbanStatusView() {
   return (
     <>
     <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה">
-      <div className="grid grid-cols-5 gap-3 items-start">
-        {STATUSES.map((status) => {
-          const colTasks = tasks.filter((t) => t.status === status);
-          const colors = STATUS_COLORS[status] || STATUS_COLORS.new;
+      {/* One column per status of the business, in its order; scrolls sideways when there are many. */}
+      <div
+        className="grid gap-3 items-start overflow-x-auto"
+        style={{ gridTemplateColumns: `repeat(${statuses.length || 1}, minmax(180px, 1fr))` }}
+      >
+        {statuses.map((status) => {
+          const colTasks = tasks.filter((t) => t.status === status.key);
+          const colors = STATUS_COLOR_OPTIONS[status.color] || STATUS_COLOR_OPTIONS.gray;
           return (
             <div
-              key={status}
+              key={status.key}
               className="bg-gray-50 border rounded-lg overflow-hidden min-h-[300px]"
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), status)}
+              onDrop={(e) => moveTask(e.dataTransfer.getData('taskId'), status.key)}
             >
               <div className={`h-1 ${colors.bar}`} />
               <div className="p-2">
                 <div className="flex items-center justify-between mb-2 px-1">
-                  <h3 className="font-semibold text-sm text-gray-700">{STATUS_LABELS[status]}</h3>
+                  <h3 className="font-semibold text-sm text-gray-700">
+                    {status.label}
+                    {status.is_final && <span className="text-gray-400 font-normal"> ✓</span>}
+                  </h3>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.badge}`}>
                     {colTasks.length}
                   </span>

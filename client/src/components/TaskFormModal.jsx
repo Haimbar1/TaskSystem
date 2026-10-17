@@ -106,7 +106,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded p-4 w-full max-w-2xl space-y-3 max-h-[92vh] overflow-y-auto"
+        className="bg-white rounded p-4 w-full max-w-2xl lg:max-w-5xl space-y-3 max-h-[92vh] overflow-y-auto"
       >
         {/* Save / cancel also at the top, staying in view while the form scrolls (long description
             and notes); the error shows here too, so a click up here isn't answered out of sight. */}

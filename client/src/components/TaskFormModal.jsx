@@ -23,6 +23,9 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // A note typed in "הערות ביצוע" but not added with "הוסף הערה" would be lost on save.
+  const [hasUnaddedNote, setHasUnaddedNote] = useState(false);
+  const UNADDED_NOTE = 'כתבת הערת ביצוע ולא הוספת אותה — לחצי "הוסף הערה" (או מחקי את הטקסט) ואז שמרי.';
 
   useEffect(() => {
     api
@@ -43,6 +46,10 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     e.preventDefault();
     if (!title.trim()) {
       setError('חובה להזין כותרת');
+      return;
+    }
+    if (hasUnaddedNote) {
+      setError(UNADDED_NOTE);
       return;
     }
     if (needsCreator && !createdBy) {
@@ -185,7 +192,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         </div>
 
         {isEdit ? (
-          <TaskNotes taskId={task.id} />
+          <TaskNotes taskId={task.id} onDraftChange={setHasUnaddedNote} />
         ) : (
           <p className="text-xs text-gray-400">הערות ביצוע אפשר להוסיף אחרי יצירת המשימה.</p>
         )}
@@ -206,7 +213,14 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             <span />
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg border">
+            <button
+              type="button"
+              onClick={() => {
+                if (hasUnaddedNote && !window.confirm('יש הערת ביצוע שלא נוספה. לסגור בלי לשמור אותה?')) return;
+                onClose();
+              }}
+              className="px-3 py-2 rounded-lg border"
+            >
               ביטול
             </button>
             <button

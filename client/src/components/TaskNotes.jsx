@@ -14,9 +14,14 @@ function formatTime(value) {
   });
 }
 
-export default function TaskNotes({ taskId }) {
+// onDraftChange tells the form whether a note was typed but not added yet (it then won't save).
+export default function TaskNotes({ taskId, onDraftChange }) {
   const [notes, setNotes] = useState(null);
   const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    onDraftChange?.(draft.trim() !== '');
+  }, [draft]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 

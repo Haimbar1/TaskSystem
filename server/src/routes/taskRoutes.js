@@ -4,9 +4,23 @@ import { logActivityAndNotify } from '../services/notifications.js';
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 import { takePendingTask } from './openTaskRoutes.js';
 import { getStatuses, finalKeys } from '../services/taskStatuses.js';
+import { actorFor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
+
+// The edit form sends every field back, so compare what it means: a DATE column comes back as a
+// Date but is sent as "2026-09-14", and an empty description is null in one and '' in the other.
+function sameValue(stored, sent) {
+  const norm = (v) => {
+    if (v == null || v === '') return '';
+    if (v instanceof Date) {
+      return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+    }
+    return String(v);
+  };
+  return norm(stored) === norm(sent);
+}
 
 // GET /api/tasks?status=new&assignee=<userId>&sort=due_date&dir=asc
 // TODO: per-column filtering beyond status/assignee (the table view needs it
@@ -95,6 +109,16 @@ router.post('/', async (req, res) => {
       );
     }
     await client.query('COMMIT');
+    // Inside Monday nobody may have picked "who am I" yet; the creator picked in the form did it.
+    req.actor = await actorFor(req);
+    if (req.actor.viaMonday && !req.actor.userId) {
+      req.actor = { ...req.actor, userId: creatorId, name: await userNames([creatorId]) };
+    }
+    await recordAction(req, {
+      action: 'task_created',
+      task,
+      details: assignee_ids.length ? `אחראים: ${await userNames(assignee_ids)}` : null,
+    });
     const whatsappMessages = await logActivityAndNotify({
       task,
       userId: creatorId,
@@ -181,15 +205,24 @@ router.patch('/:id', async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Inside Monday: the person picked on this device, else the shared login (auditLog.js).
+    req.actor = await actorFor(req);
+    const actorId = req.actor.userId || req.user.id;
+
     // One activity-log entry (and one notification fan-out) per changed field —
     // status changes are what the spec calls out specifically, but every field
     // is logged the same way.
     const whatsappMessages = [];
     for (const [key, value] of Object.entries(fields)) {
-      if (String(existing[key]) !== String(value)) {
+      if (!sameValue(existing[key], value)) {
+        await recordAction(req, {
+          action: 'task_updated',
+          task: updated,
+          details: await describeFieldChange(req.tenantId, key, existing[key], value),
+        });
         const messages = await logActivityAndNotify({
           task: updated,
-          userId: req.user.id,
+          userId: actorId,
           field: key,
           oldValue: existing[key],
           newValue: value,
@@ -204,9 +237,14 @@ router.patch('/:id', async (req, res) => {
         previousAssigneeIds.length !== assignee_ids.length ||
         !previousAssigneeIds.every((uid) => assignee_ids.includes(uid));
       if (changed) {
+        await recordAction(req, {
+          action: 'task_updated',
+          task: updated,
+          details: `אחראים: ${await userNames(previousAssigneeIds)} ← ${await userNames(assignee_ids)}`,
+        });
         const messages = await logActivityAndNotify({
           task: updated,
-          userId: req.user.id,
+          userId: actorId,
           field: 'assignees',
           oldValue: previousAssigneeIds.join(','),
           newValue: assignee_ids.join(','),
@@ -237,10 +275,11 @@ router.delete('/:id', async (req, res) => {
   // all have ON DELETE CASCADE on task_id (see migrations/001_init.sql), so
   // deleting the task row is enough.
   const { rows } = await pool.query(
-    'DELETE FROM tasks WHERE id = $1 AND tenant_id = $2 RETURNING id',
+    'DELETE FROM tasks WHERE id = $1 AND tenant_id = $2 RETURNING id, title',
     [id, req.tenantId]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  await recordAction(req, { action: 'task_deleted', task: rows[0] });
   res.status(204).end();
 });
 

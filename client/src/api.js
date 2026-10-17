@@ -1,10 +1,17 @@
+import { getActingUserId } from './actingUser.js';
+
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 async function request(path, options = {}) {
+  const actingUser = getActingUserId();
   const res = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(actingUser && { 'X-Acting-User': actingUser }),
+      ...options.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -46,6 +53,7 @@ export const api = {
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
   getWhatsAppLog: () => request('/api/tenants/whatsapp-log'),
+  getAuditLog: () => request('/api/tenants/audit-log'),
   getTaskStatuses: () => request('/api/tenants/task-statuses'),
   updateTaskStatuses: (statuses) =>
     request('/api/tenants/task-statuses', { method: 'PUT', body: JSON.stringify({ statuses }) }),

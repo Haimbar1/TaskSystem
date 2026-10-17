@@ -3,16 +3,7 @@ import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { PRIORITY_LABELS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
-
-// Last creator picked on this device, so an embedded (shared-login) user doesn't re-pick every time.
-const CREATOR_KEY = 'tasks.embedCreatorId';
-function readSavedCreator() {
-  try {
-    return localStorage.getItem(CREATOR_KEY) || '';
-  } catch {
-    return '';
-  }
-}
+import { getActingUserId, setActingUserId } from '../actingUser.js';
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
@@ -20,7 +11,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   // Logged in through an embed, everyone shares one login, so a new task must say who created it
   // (they're the one notified on its later changes).
   const needsCreator = !isEdit && user?.is_embed;
-  const [createdBy, setCreatedBy] = useState(needsCreator ? readSavedCreator() : '');
+  const [createdBy, setCreatedBy] = useState(needsCreator ? getActingUserId() : '');
   const [users, setUsers] = useState([]);
   const [usersError, setUsersError] = useState('');
   const [title, setTitle] = useState(task?.title || '');
@@ -69,11 +60,8 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
       };
       if (needsCreator) {
         payload.created_by = createdBy;
-        try {
-          localStorage.setItem(CREATOR_KEY, createdBy);
-        } catch {
-          // Storage unavailable (e.g. blocked in the iframe) — they'll just pick again next time.
-        }
+        // Whoever creates a task here is who's using this device (the "who am I" in Nav).
+        if (createdBy !== getActingUserId()) setActingUserId(createdBy);
       }
       const saved = isEdit ? await api.updateTask(task.id, payload) : await api.createTask(payload);
       (onSaved || onCreated)?.(saved);

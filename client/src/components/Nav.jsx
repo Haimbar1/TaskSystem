@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import TaskFormModal from './TaskFormModal.jsx';
 import SettingsMenu from './SettingsMenu.jsx';
 import AppSwitcher from './AppSwitcher.jsx';
+import ActingUserPicker from './ActingUserPicker.jsx';
 
 function inIframe() {
   try {
@@ -76,6 +77,8 @@ export default function Nav() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Shared Monday login: who's using this device, for the action log. */}
+            {user?.is_embed && <ActingUserPicker />}
             <button
               onClick={() => setShowTaskForm(true)}
               className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors"

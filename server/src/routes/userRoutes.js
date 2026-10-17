@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { EMBED_USER_EMAIL, getEmbedToken, ensureOptionalUserEmail, isEmbedUser } from '../embed.js';
+import { recordAction } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -47,6 +48,7 @@ router.post('/invite', requireEmbedUserAdmin, async (req, res) => {
        VALUES ($1, $2, $3, $4, 'member') RETURNING id, name, email, phone, role`,
       [req.tenantId, email, name, phone]
     );
+    await recordAction(req, { action: 'user_added', details: `${name} · ${phone}` });
     res.status(201).json(rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -65,12 +67,20 @@ router.patch('/:id', requireEmbedUserAdmin, async (req, res) => {
   if (!phone) {
     return res.status(400).json({ error: 'phone is required' });
   }
+  const { rows: before } = await pool.query('SELECT name, phone FROM users WHERE id = $1 AND tenant_id = $2', [
+    id,
+    req.tenantId,
+  ]);
   const { rows } = await pool.query(
     `UPDATE users SET name = $1, phone = $2 WHERE id = $3 AND tenant_id = $4
      RETURNING id, name, email, phone, role`,
     [name, phone, id, req.tenantId]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  await recordAction(req, {
+    action: 'user_updated',
+    details: `${before[0]?.name || '—'} · ${before[0]?.phone || '—'} ← ${rows[0].name || '—'} · ${rows[0].phone}`,
+  });
   res.json(rows[0]);
 });
 
@@ -85,7 +95,7 @@ router.delete('/:id', requireEmbedUserAdmin, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND email IS DISTINCT FROM $3 FOR UPDATE',
+      'SELECT id, name, email FROM users WHERE id = $1 AND tenant_id = $2 AND email IS DISTINCT FROM $3 FOR UPDATE',
       [id, req.tenantId, EMBED_USER_EMAIL]
     );
     if (!rows[0]) {
@@ -97,6 +107,7 @@ router.delete('/:id', requireEmbedUserAdmin, async (req, res) => {
     await client.query('UPDATE task_files SET uploaded_by = NULL WHERE uploaded_by = $1', [id]);
     await client.query('DELETE FROM users WHERE id = $1', [id]);
     await client.query('COMMIT');
+    await recordAction(req, { action: 'user_deleted', details: rows[0].name || rows[0].email });
     res.status(204).end();
   } catch (err) {
     await client.query('ROLLBACK');

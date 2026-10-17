@@ -6,6 +6,7 @@ import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '.
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
 import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
+import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
 
 const router = Router();
@@ -108,6 +109,7 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
     req.user?.email
   );
   if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
+  await recordAction(req, { action: 'settings_changed', details: 'הגדרות וואטסאפ' });
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
@@ -120,7 +122,16 @@ router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {
 router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   const result = await setStatuses(req.tenantId, req.body?.statuses);
   if (result.error) return res.status(400).json({ error: result.error });
+  await recordAction(req, {
+    action: 'statuses_changed',
+    details: result.statuses.map((s) => s.label + (s.is_final ? ' (סיום)' : '')).join(', '),
+  });
   res.json({ statuses: result.statuses, colors: STATUS_COLORS });
+});
+
+// The active business's action log, newest first (see services/auditLog.js).
+router.get('/audit-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+  res.json(await listActions(req.tenantId));
 });
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
@@ -136,11 +147,14 @@ router.get('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async 
 });
 
 router.post('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
-  res.json({ token: await rotateEmbedToken(req.tenantId) });
+  const token = await rotateEmbedToken(req.tenantId);
+  await recordAction(req, { action: 'settings_changed', details: 'נוצר קישור הטמעה חדש ל-Monday' });
+  res.json({ token });
 });
 
 router.delete('/embed-token', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   await clearEmbedToken(req.tenantId);
+  await recordAction(req, { action: 'settings_changed', details: 'קישור ההטמעה ל-Monday בוטל' });
   res.json({ token: null });
 });
 

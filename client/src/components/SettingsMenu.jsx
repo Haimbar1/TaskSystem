@@ -86,6 +86,11 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
               סטטוסים של משימות
             </button>
           )}
+          {(canManageUsers || isEmbed) && (
+            <button onClick={() => go('/audit-log')} className={itemClass}>
+              יומן פעולות
+            </button>
+          )}
           {user?.is_super_admin && (
             <>
               <div className="px-2.5 pt-1">

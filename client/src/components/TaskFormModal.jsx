@@ -82,6 +82,11 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     }
   }
 
+  function handleCancel() {
+    if (hasUnaddedNote && !window.confirm('יש הערת ביצוע שלא נוספה. לסגור בלי לשמור אותה?')) return;
+    onClose();
+  }
+
   async function handleDelete() {
     if (!window.confirm(`למחוק את המשימה "${task.title}"? לא ניתן לשחזר.`)) return;
     setDeleting(true);
@@ -103,7 +108,26 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         onSubmit={handleSubmit}
         className="bg-white rounded p-4 w-full max-w-2xl space-y-3 max-h-[92vh] overflow-y-auto"
       >
-        <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
+        {/* Save / cancel also at the top, staying in view while the form scrolls (long description
+            and notes); the error shows here too, so a click up here isn't answered out of sight. */}
+        <div className="sticky -top-4 -mx-4 -mt-4 px-4 pt-4 pb-2 bg-white border-b z-10">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
+            <div className="flex gap-2">
+              <button type="button" onClick={handleCancel} className="px-3 py-1.5 rounded-lg border text-sm">
+                ביטול
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50"
+              >
+                {saving ? 'שומר…' : isEdit ? 'שמור' : 'צור משימה'}
+              </button>
+            </div>
+          </div>
+          {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
+        </div>
 
         {needsCreator && (
           <div>
@@ -213,14 +237,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             <span />
           )}
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (hasUnaddedNote && !window.confirm('יש הערת ביצוע שלא נוספה. לסגור בלי לשמור אותה?')) return;
-                onClose();
-              }}
-              className="px-3 py-2 rounded-lg border"
-            >
+            <button type="button" onClick={handleCancel} className="px-3 py-2 rounded-lg border">
               ביטול
             </button>
             <button

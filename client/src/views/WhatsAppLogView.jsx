@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { api } from '../api.js';
 import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
+import { explainMetaError } from '../metaErrors.js';
 
 // The business's outgoing WhatsApp messages and what became of each (server/src/services/whatsappLog.js).
 // "התקבלה ב-Meta" is all that's known at send time; sent/delivered/read/failed come later from
@@ -30,6 +31,35 @@ function formatTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// What a failed message's Meta error means and what to do about it (metaErrors.js).
+function ErrorHelp({ why }) {
+  return (
+    <div className="mb-3 p-3 rounded-lg border border-red-200 bg-red-50 text-sm">
+      <div className="font-semibold text-red-800 mb-1">
+        למה ההודעה נכשלה? {why.title} <span className="font-normal text-red-600">(קוד {why.code})</span>
+      </div>
+      <p className="text-gray-700">{why.explain}</p>
+      {why.causes && (
+        <ul className="list-disc pr-5 mt-1 space-y-0.5 text-gray-700">
+          {why.causes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
+      {why.fix && (
+        <>
+          <div className="font-semibold text-gray-800 mt-2">מה לעשות:</div>
+          <ol className="list-decimal pr-5 mt-1 space-y-0.5 text-gray-700">
+            {why.fix.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function WhatsAppLogView() {
@@ -67,7 +97,7 @@ export default function WhatsAppLogView() {
       </div>
       <p className="text-gray-500 text-sm mb-3">
         200 ההודעות האחרונות של העסק. "התקבלה ב-Meta" אומר ש-Meta קיבלה את הבקשה לשליחה; האם ההודעה באמת הגיעה לטלפון
-        (נשלחה / נמסרה / נקראה / נכשלה) מתעדכן כאן כש-Meta מדווחת על כך. לחיצה על שורה מציגה את נוסח ההודעה.
+        (נשלחה / נמסרה / נקראה / נכשלה) מתעדכן כאן כש-Meta מדווחת על כך. לחיצה על שורה מציגה את נוסח ההודעה, ובהודעה שנכשלה גם הסבר מה לא בסדר ומה לעשות.
       </p>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -91,6 +121,7 @@ export default function WhatsAppLogView() {
               {messages.map((m) => {
                 const status = STATUS[m.status] || { label: m.status, className: 'bg-gray-100 text-gray-700' };
                 const open = openId === m.id;
+                const why = m.error ? explainMetaError(m.error) : null;
                 return (
                   <Fragment key={m.id}>
                     <tr
@@ -116,11 +147,18 @@ export default function WhatsAppLogView() {
                           <div className="text-xs text-gray-400 mt-0.5">{formatTime(m.updated_at)}</div>
                         )}
                       </td>
-                      <td className="py-2 px-2 text-red-600 text-xs">{m.error}</td>
+                      <td className="py-2 px-2 text-xs">
+                        {why?.title && <div className="font-medium text-red-700">{why.title}</div>}
+                        <div className="text-red-600" dir="auto">
+                          {m.error}
+                        </div>
+                        {why?.title && !open && <div className="text-gray-400 mt-0.5">לחצו להסבר ומה לעשות</div>}
+                      </td>
                     </tr>
                     {open && (
                       <tr className="border-b bg-gray-50">
                         <td colSpan={6} className="py-2 px-3">
+                          {why?.title && <ErrorHelp why={why} />}
                           <div className="text-xs text-gray-500 mb-1">תבנית: {m.template_name}</div>
                           <pre className="whitespace-pre-wrap font-sans text-sm">{m.text || '—'}</pre>
                         </td>

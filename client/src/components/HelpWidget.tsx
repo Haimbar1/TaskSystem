@@ -53,11 +53,22 @@ const IconX = ({ className }: { className?: string }) => (
     <path d="M18 6 6 18M6 6l12 12" />
   </Svg>
 );
-const IconHelp = ({ className }: { className?: string }) => (
+// The AI assistant: a chat bubble with a bot face (like the CRM's BotMessageSquare)
+const IconBot = ({ className }: { className?: string }) => (
   <Svg className={className}>
-    <circle cx="12" cy="12" r="10" />
-    <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
+    <path d="M12 6V2H8" />
+    <path d="m8 18-4 4V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2Z" />
+    <path d="M2 12h2M9 11v2M15 11v2M20 12h2" />
   </Svg>
+);
+// The floating button's icon: the bot with a small AI sparkle
+const IconAssistant = ({ className }: { className?: string }) => (
+  <span className="relative">
+    <IconBot className={className} />
+    <svg viewBox="0 0 24 24" className="w-3 h-3 absolute -top-1.5 -left-1.5 text-amber-300" fill="currentColor">
+      <path d="M9.9 15.5a2 2 0 0 0-1.4-1.4l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.4-1.4l1.6-6.1a.5.5 0 0 1 1 0l1.6 6.1a2 2 0 0 0 1.4 1.4l6.1 1.6a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0z" />
+    </svg>
+  </span>
 );
 const IconSend = ({ className }: { className?: string }) => (
   <Svg className={className}>
@@ -474,7 +485,7 @@ export function HelpWidget({
         >
           <div className={`${t.bg} text-white px-4 py-3 flex items-center justify-between shrink-0`}>
             <div className="flex items-center gap-2">
-              <IconHelp />
+              <IconBot className="w-5 h-5" />
               <div>
                 <div className="font-bold leading-tight">{title}</div>
                 <div className="text-[10px] text-white/75 leading-tight">{subtitle}</div>
@@ -642,7 +653,7 @@ export function HelpWidget({
         title={`${title} — איך עושים את זה?`}
         className={`${buttonClassName} z-[9990] w-12 h-12 rounded-full ${t.bg} ${t.hover} text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105 cursor-pointer`}
       >
-        {open ? <IconX className="w-5 h-5" /> : <IconHelp className="w-6 h-6" />}
+        {open ? <IconX className="w-5 h-5" /> : <IconAssistant className="w-6 h-6" />}
       </button>
     </>
   );

@@ -28,7 +28,12 @@ export default function WhatsAppSettingsView() {
   const [taking, setTaking] = useState(false);
   const [takeMessage, setTakeMessage] = useState('');
 
+  const [wabaNumbers, setWabaNumbers] = useState([]);
+  const [phoneNotInWaba, setPhoneNotInWaba] = useState(false);
+
   function applySettings(s) {
+    setWabaNumbers(s.waba_numbers || []);
+    setPhoneNotInWaba(!!s.phone_not_in_waba);
     setTokenSet(s.whatsapp_access_token_set);
     setPhoneNumberId(s.whatsapp_phone_number_id);
     setWabaId(s.whatsapp_waba_id);
@@ -79,9 +84,7 @@ export default function WhatsAppSettingsView() {
 
   function load() {
     api.getWhatsAppSettings().then((s) => {
-      setTokenSet(s.whatsapp_access_token_set);
-      setPhoneNumberId(s.whatsapp_phone_number_id);
-      setWabaId(s.whatsapp_waba_id);
+      applySettings(s);
       setLinked(!!s.linked);
       setForwardUrl(s.status_forward_url || '');
       setMessageLink(s.message_link_url || '');
@@ -211,6 +214,22 @@ export default function WhatsAppSettingsView() {
             value={wabaId}
             onChange={(e) => setWabaId(e.target.value)}
           />
+          {phoneNotInWaba && (
+            <div className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 space-y-1">
+              <p>ה-Phone Number ID השמור לא שייך ל-WABA הזה. המספרים של ה-WABA לפי Meta:</p>
+              {wabaNumbers.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => setPhoneNumberId(n.id)}
+                  className="block text-right underline hover:no-underline"
+                >
+                  {n.display_phone_number || n.id} <span dir="ltr">({n.id})</span> — השתמש במספר הזה
+                </button>
+              ))}
+              <p className="text-xs">אחרי הבחירה לוחצים "שמור".</p>
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-sm mb-1">קישור למשימה בהודעות</label>

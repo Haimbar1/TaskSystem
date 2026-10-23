@@ -81,7 +81,18 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res) => {
 // business not linked to the portal). Access token is never sent back to the client in full.
 async function whatsappSettingsResponse(tenantId, extra = {}) {
   const { values, sources, linked } = await whatsappCredentials(tenantId);
+  // The WABA's numbers as Meta has them, to flag a Phone Number ID that isn't one of them (it then
+  // sends from a number other than the WABA's, or fails). [] when Meta can't list them: no warning.
+  const wabaNumbers =
+    values.whatsapp_access_token && values.whatsapp_waba_id
+      ? await listPhoneNumbers({ accessToken: values.whatsapp_access_token, wabaId: values.whatsapp_waba_id })
+      : [];
   return {
+    waba_numbers: wabaNumbers.map((n) => ({ id: n.id, display_phone_number: n.display_phone_number || '' })),
+    phone_not_in_waba:
+      wabaNumbers.length > 0 &&
+      !!values.whatsapp_phone_number_id &&
+      !wabaNumbers.some((n) => n.id === values.whatsapp_phone_number_id),
     whatsapp_access_token_set: !!values.whatsapp_access_token,
     whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
     whatsapp_waba_id: values.whatsapp_waba_id || '',
@@ -122,6 +133,9 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
+// BotApp's shared demo number (050-672-5398) belongs to no business, so it's never offered.
+const isDemoNumber = (display) => String(display || '').replace(/\D/g, '').slice(-9) === '506725398';
+
 // Super admin: every WhatsApp number the businesses' WABAs hold (this one included), as Meta shows
 // it, to move one into the active business by the number people know. A WABA several businesses
 // share is listed once. A business whose numbers Meta won't list still shows, by its Phone Number ID.
@@ -142,7 +156,7 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
     });
     const list = numbers.length ? numbers : [{ id: values.whatsapp_phone_number_id }];
     for (const n of list) {
-      if (seen.has(n.id)) continue;
+      if (seen.has(n.id) || isDemoNumber(n.display_phone_number)) continue;
       seen.add(n.id);
       sources.push({
         origin: 'tasks',
@@ -157,6 +171,7 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
   }
   const nameByPortalId = new Map(rows.filter((t) => t.portal_tenant_id).map((t) => [Number(t.portal_tenant_id), t.name]));
   for (const a of await listWhatsAppSystemAccounts()) {
+    if (isDemoNumber(a.displayPhoneNumber)) continue;
     if (seen.has(a.phoneNumberId)) {
       // Already listed from a business here: show it by the number and name the WhatsApp system knows.
       const listed = sources.find((s) => s.whatsapp_phone_number_id === a.phoneNumberId);

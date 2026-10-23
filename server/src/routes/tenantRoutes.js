@@ -5,6 +5,7 @@ import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '../embed.js';
 import { whatsappCredentials, writeToVault } from '../tenantSecrets.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
+import { listPhoneNumbers } from '../services/whatsapp.js';
 import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
@@ -113,36 +114,63 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
-// Super admin: the WABAs the other businesses send from, to move one into the active business
-// without retyping it. Only businesses with a full connection (token + Phone Number ID) are listed.
+// Super admin: every WhatsApp number the businesses' WABAs hold (this one included), as Meta shows
+// it, to move one into the active business by the number people know. A WABA several businesses
+// share is listed once. A business whose numbers Meta won't list still shows, by its Phone Number ID.
 router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name FROM tenants WHERE id <> $1 ORDER BY name', [req.tenantId]);
+  const { rows } = await pool.query('SELECT id, name FROM tenants ORDER BY id = $1 DESC, name', [req.tenantId]);
   const sources = [];
+  const seen = new Set();
   for (const t of rows) {
     const { values } = await whatsappCredentials(t.id);
     if (!values.whatsapp_access_token || !values.whatsapp_phone_number_id) continue;
-    sources.push({
-      tenant_id: t.id,
-      tenant_name: t.name,
-      whatsapp_waba_id: values.whatsapp_waba_id,
-      whatsapp_phone_number_id: values.whatsapp_phone_number_id,
+    const numbers = await listPhoneNumbers({
+      accessToken: values.whatsapp_access_token,
+      wabaId: values.whatsapp_waba_id,
+      phoneNumberId: values.whatsapp_phone_number_id,
     });
+    const list = numbers.length ? numbers : [{ id: values.whatsapp_phone_number_id }];
+    for (const n of list) {
+      if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      sources.push({
+        tenant_id: t.id,
+        tenant_name: t.name,
+        whatsapp_waba_id: values.whatsapp_waba_id,
+        whatsapp_phone_number_id: n.id,
+        display_phone_number: n.display_phone_number || '',
+        verified_name: n.verified_name || '',
+      });
+    }
   }
   res.json({ sources });
 });
 
-// Takes another business's WABA into the active business: its token, Phone Number ID and WABA ID
-// are saved here exactly as the settings form saves them (tenants row + portal vault). The other
-// business keeps its own copy — the vault is never cleared from here.
+// Takes one of those numbers into the active business: the token and WABA ID of the business it
+// came from, with the chosen Phone Number ID, are saved here exactly as the settings form saves them
+// (tenants row + portal vault). The other business keeps its own copy — the vault is never cleared
+// from here.
 router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   const sourceId = Number(req.body?.sourceTenantId);
-  if (!sourceId || sourceId === Number(req.tenantId)) return res.status(400).json({ error: 'בחרו עסק אחר' });
+  const phoneNumberId = String(req.body?.phoneNumberId || '');
+  if (!sourceId || !phoneNumberId) return res.status(400).json({ error: 'בחרו מספר' });
   const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [sourceId]);
   if (!rows[0]) return res.status(404).json({ error: 'העסק לא נמצא' });
-  const { values } = await whatsappCredentials(sourceId);
-  if (!values.whatsapp_access_token || !values.whatsapp_phone_number_id) {
+  const { values: source } = await whatsappCredentials(sourceId);
+  if (!source.whatsapp_access_token || !source.whatsapp_phone_number_id) {
     return res.status(400).json({ error: 'לעסק הזה אין וואטסאפ מחובר' });
   }
+  // Only a number that business's WABA really holds, so a token never pairs with a foreign number.
+  const numbers = await listPhoneNumbers({
+    accessToken: source.whatsapp_access_token,
+    wabaId: source.whatsapp_waba_id,
+    phoneNumberId: source.whatsapp_phone_number_id,
+  });
+  const number = numbers.find((n) => n.id === phoneNumberId);
+  if (!number && phoneNumberId !== source.whatsapp_phone_number_id) {
+    return res.status(400).json({ error: 'המספר לא שייך ל-WABA של העסק הזה' });
+  }
+  const values = { ...source, whatsapp_phone_number_id: phoneNumberId };
   await pool.query(
     `UPDATE tenants SET whatsapp_access_token = $1, whatsapp_phone_number_id = $2, whatsapp_waba_id = $3 WHERE id = $4`,
     [values.whatsapp_access_token, values.whatsapp_phone_number_id, values.whatsapp_waba_id || '', req.tenantId]
@@ -151,7 +179,7 @@ router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireS
   if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
   await recordAction(req, {
     action: 'settings_changed',
-    details: `וואטסאפ: הועבר WABA ${values.whatsapp_waba_id || '(ללא מזהה)'} מהעסק "${rows[0].name}"`,
+    details: `וואטסאפ: הועבר המספר ${number?.display_phone_number || phoneNumberId} (WABA ${values.whatsapp_waba_id || 'ללא מזהה'}) מהעסק "${rows[0].name}"`,
   });
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });

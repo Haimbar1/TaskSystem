@@ -34,25 +34,33 @@ export default function WhatsAppSettingsView() {
     setMessageLink(s.message_link_url || '');
   }
 
-  // Super admin: move another business's WABA (with its token and Phone Number ID) into this one.
+  // A number as people know it: "+972 50-123-4567 · Verified name", or its Phone Number ID when Meta
+  // didn't say.
+  function numberLabel(s) {
+    if (!s.display_phone_number) return `Phone Number ID ${s.whatsapp_phone_number_id}`;
+    return s.verified_name ? `${s.display_phone_number} · ${s.verified_name}` : s.display_phone_number;
+  }
+
+  // Super admin: move a WhatsApp number (with its WABA and token) into this business.
   async function handleTake() {
-    const source = sources.find((s) => String(s.tenant_id) === sourceId);
+    const source = sources.find((s) => s.whatsapp_phone_number_id === sourceId);
     if (!source) return;
     const ok = window.confirm(
-      `להעביר לעסק הזה את ה-WABA ${source.whatsapp_waba_id || ''} של "${source.tenant_name}"?\n` +
-        'הטוקן וה-Phone Number ID שלו יחליפו את הנוכחיים, וההודעות של העסק הזה יישלחו מהמספר שלו.'
+      `לעבור לשלוח מהמספר ${numberLabel(source)}?\n` +
+        `(WABA ${source.whatsapp_waba_id || 'ללא מזהה'} של "${source.tenant_name}")\n` +
+        'הטוקן, ה-WABA ID וה-Phone Number ID שלו יחליפו את הנוכחיים בעסק הזה.'
     );
     if (!ok) return;
     setTaking(true);
     setTakeMessage('');
     try {
-      const s = await api.takeWhatsAppFrom(source.tenant_id);
+      const s = await api.takeWhatsAppFrom(source.tenant_id, source.whatsapp_phone_number_id);
       applySettings(s);
       setAccessToken('');
       setSourceId('');
       setTakeMessage(
         !s.linked || s.vault?.ok
-          ? `ה-WABA של "${source.tenant_name}" הועבר לעסק הזה`
+          ? `העסק שולח עכשיו מהמספר ${numberLabel(source)}`
           : 'הועבר כאן, אבל השמירה בפורטל נכשלה — נסו שוב או עדכנו בפורטל ב"מזהים וחיבורים"'
       );
     } catch (err) {
@@ -138,9 +146,10 @@ export default function WhatsAppSettingsView() {
       )}
       {canEdit && sources.length > 0 && (
         <div className="mb-4 border rounded-lg p-3 bg-gray-50 space-y-2">
-          <h3 className="font-semibold text-sm">החלפת WABA</h3>
+          <h3 className="font-semibold text-sm">החלפת מספר וואטסאפ (WABA)</h3>
           <p className="text-xs text-gray-500">
-            בחרו WABA של עסק אחר — הטוקן וה-Phone Number ID שלו עוברים איתו לעסק הזה. העסק השני ממשיך לשלוח ממנו.
+            כל המספרים בחשבונות ה-WABA של העסקים שלך. בחרו מספר — ה-WABA והטוקן שלו עוברים איתו לעסק הזה, והעסק
+            שממנו הוא הגיע ממשיך לשלוח ממנו.
           </p>
           <div className="flex gap-2">
             <select
@@ -148,13 +157,16 @@ export default function WhatsAppSettingsView() {
               value={sourceId}
               onChange={(e) => setSourceId(e.target.value)}
             >
-              <option value="">בחרו WABA…</option>
-              {sources.map((s) => (
-                <option key={s.tenant_id} value={s.tenant_id}>
-                  {s.tenant_name} — WABA {s.whatsapp_waba_id || 'ללא מזהה'}
-                  {s.whatsapp_waba_id === wabaId && s.whatsapp_phone_number_id === phoneNumberId ? ' (הנוכחי)' : ''}
-                </option>
-              ))}
+              <option value="">בחרו מספר…</option>
+              {sources.map((s) => {
+                const current = s.whatsapp_phone_number_id === phoneNumberId;
+                return (
+                  <option key={s.whatsapp_phone_number_id} value={s.whatsapp_phone_number_id} disabled={current}>
+                    {numberLabel(s)} — {s.tenant_name}
+                    {current ? ' (המספר הנוכחי)' : ''}
+                  </option>
+                );
+              })}
             </select>
             <button
               type="button"

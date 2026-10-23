@@ -12,6 +12,34 @@ const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 // tenantSecrets.js) sends every notification for real through the Meta Cloud API; a business
 // without them simply gets no WhatsApp messages.
 
+// The phone numbers a business's token can send from, as Meta shows them (for picking a WABA by
+// the number people know): [{ id, display_phone_number, verified_name }]. Lists every number in the
+// WABA when its ID is known, else just the one Phone Number ID. [] when Meta can't be reached.
+export async function listPhoneNumbers({ accessToken, wabaId, phoneNumberId }) {
+  const fields = 'display_phone_number,verified_name';
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  try {
+    if (wabaId) {
+      const res = await fetch(`${GRAPH_API_URL}/${wabaId}/phone_numbers?fields=${fields}`, {
+        headers,
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.data) && data.data.length) return data.data;
+    }
+    if (!phoneNumberId) return [];
+    const res = await fetch(`${GRAPH_API_URL}/${phoneNumberId}?fields=${fields}`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok && data.id ? [data] : [];
+  } catch (err) {
+    console.warn('[whatsapp] listing phone numbers failed:', err?.message);
+    return [];
+  }
+}
+
 // Meta wants the number in international form, digits only: 050-1234567 → 972501234567.
 function toWhatsAppNumber(phone) {
   const digits = String(phone).replace(/\D/g, '');

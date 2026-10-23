@@ -150,7 +150,14 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
   }
   const nameByPortalId = new Map(rows.filter((t) => t.portal_tenant_id).map((t) => [Number(t.portal_tenant_id), t.name]));
   for (const a of await listWhatsAppSystemAccounts()) {
-    if (seen.has(a.phoneNumberId)) continue;
+    if (seen.has(a.phoneNumberId)) {
+      // Already listed from a business here: show it by the number and name the WhatsApp system knows.
+      const listed = sources.find((s) => s.whatsapp_phone_number_id === a.phoneNumberId);
+      listed.display_phone_number ||= a.displayPhoneNumber;
+      listed.verified_name ||= a.verifiedName;
+      listed.account_name ||= a.name;
+      continue;
+    }
     seen.add(a.phoneNumberId);
     sources.push({
       origin: 'whatsapp',

@@ -6,7 +6,14 @@ import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '.
 import { whatsappCredentials, writeToVault, forgetVaultCache } from '../tenantSecrets.js';
 import { listWhatsAppSystemAccounts, moveAccountToVault } from '../services/whatsappSystemAccounts.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
-import { listPhoneNumbers } from '../services/whatsapp.js';
+import { listPhoneNumbers, listApprovedTemplates } from '../services/whatsapp.js';
+import {
+  TEMPLATE_EVENTS,
+  TEMPLATE_FIELDS,
+  DEFAULT_TEMPLATES,
+  getTemplateSettings,
+  setTemplateSettings,
+} from '../services/whatsappTemplates.js';
 import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
@@ -242,6 +249,38 @@ router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireS
     details: `וואטסאפ: הועבר המספר ${number?.display_phone_number || phoneNumberId} (WABA ${values.whatsapp_waba_id || 'ללא מזהה'}) מהעסק "${rows[0].name}"`,
   });
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
+});
+
+// Which Meta template each message goes out on, and what fills its variables
+// (services/whatsappTemplates.js). Super admin, like the rest of the WhatsApp settings. GET also
+// returns the business's WABA's approved templates to choose from.
+router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
+  const { values } = await whatsappCredentials(req.tenantId);
+  const approved = await listApprovedTemplates({
+    accessToken: values.whatsapp_access_token,
+    wabaId: values.whatsapp_waba_id,
+  });
+  res.json({
+    events: TEMPLATE_EVENTS,
+    fields: Object.fromEntries(Object.entries(TEMPLATE_FIELDS).map(([key, f]) => [key, f.label])),
+    defaults: DEFAULT_TEMPLATES,
+    settings: await getTemplateSettings(req.tenantId),
+    approved: approved.templates || [],
+    approved_error: approved.error || '',
+  });
+});
+
+router.put('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
+  const error = await setTemplateSettings(req.tenantId, req.body?.settings);
+  if (error) return res.status(400).json({ error });
+  const settings = await getTemplateSettings(req.tenantId);
+  await recordAction(req, {
+    action: 'settings_changed',
+    details:
+      'תבניות וואטסאפ: ' +
+      TEMPLATE_EVENTS.map((e) => `${e.label} — ${(settings[e.key] || DEFAULT_TEMPLATES[e.key]).name}`).join(', '),
+  });
+  res.json({ settings });
 });
 
 // The active business's task statuses (services/taskStatuses.js). Everyone needs them for the

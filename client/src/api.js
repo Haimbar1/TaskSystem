@@ -54,6 +54,9 @@ export const api = {
   getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
+  getWhatsAppTemplates: () => request('/api/tenants/whatsapp-templates'),
+  updateWhatsAppTemplates: (settings) =>
+    request('/api/tenants/whatsapp-templates', { method: 'PUT', body: JSON.stringify({ settings }) }),
   getWhatsAppSources: () => request('/api/tenants/whatsapp-sources'),
   takeWhatsAppFrom: ({ origin, tenant_id, whatsapp_phone_number_id }) =>
     request('/api/tenants/whatsapp-settings/take-from', {

@@ -1,5 +1,5 @@
 import { pool } from '../db.js';
-import { WHATSAPP_TEMPLATES } from './whatsappTemplates.js';
+import { templateFor } from './whatsappTemplates.js';
 import { getStatuses, statusLabel } from './taskStatuses.js';
 import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
@@ -40,6 +40,36 @@ export async function listPhoneNumbers({ accessToken, wabaId, phoneNumberId }) {
   }
 }
 
+// The WABA's approved templates the task system can send: only ones whose variables are all in the
+// body (a header or button variable, or a media header, needs values it can't fill). Returns
+// { templates: [{ name, language, category, body }] } or { error } (Meta's message).
+export async function listApprovedTemplates({ accessToken, wabaId }) {
+  if (!accessToken || !wabaId) return { error: 'חסרים Access Token או WABA ID' };
+  try {
+    const res = await fetch(
+      `${GRAPH_API_URL}/${wabaId}/message_templates?fields=name,language,status,category,components&limit=250`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(10000) }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: data?.error?.error_user_msg || data?.error?.message || `HTTP ${res.status}` };
+    const templates = [];
+    for (const t of data.data || []) {
+      if (t.status !== 'APPROVED') continue;
+      const components = t.components || [];
+      const body = components.find((c) => c.type === 'BODY')?.text || '';
+      const header = components.find((c) => c.type === 'HEADER');
+      const buttons = components.find((c) => c.type === 'BUTTONS')?.buttons || [];
+      if (header && (header.format !== 'TEXT' || /\{\{/.test(header.text || ''))) continue;
+      if (buttons.some((b) => /\{\{/.test(b.url || '') || b.type === 'COPY_CODE' || b.type === 'OTP')) continue;
+      templates.push({ name: t.name, language: t.language, category: t.category, body });
+    }
+    templates.sort((a, b) => a.name.localeCompare(b.name));
+    return { templates };
+  } catch (err) {
+    return { error: err?.message || 'Meta לא זמינה' };
+  }
+}
+
 // Meta wants the number in international form, digits only: 050-1234567 → 972501234567.
 function toWhatsAppNumber(phone) {
   const digits = String(phone).replace(/\D/g, '');
@@ -53,7 +83,8 @@ function toWhatsAppNumber(phone) {
 // the business has no WhatsApp details, or no phone on file — that last one is still logged as
 // "not sent") — otherwise what was sent: { to, recipientName, templateName, params, text, sent }.
 export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, extra = {} }) {
-  const template = WHATSAPP_TEMPLATES[eventType];
+  // The business's chosen template for this message, else the default (whatsappTemplates.js).
+  const template = await templateFor(tenantId, eventType);
   if (!template) return null;
 
   // The portal vault's values (see tenantSecrets.js); only the original business falls back to env.
@@ -116,10 +147,11 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
         type: 'template',
         template: {
           name: message.templateName,
-          language: { code: 'he' },
-          components: [
-            { type: 'body', parameters: params.map((text) => ({ type: 'text', text: String(text) })) },
-          ],
+          language: { code: template.language },
+          // a template without variables takes no body parameters at all
+          components: params.length
+            ? [{ type: 'body', parameters: params.map((text) => ({ type: 'text', text: String(text) })) }]
+            : [],
         },
       }),
       signal: AbortSignal.timeout(10000),

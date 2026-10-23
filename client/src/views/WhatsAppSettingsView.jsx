@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
+import WhatsAppTemplatesSettings from '../components/WhatsAppTemplatesSettings.jsx';
 
 // Per-business WhatsApp Business credentials (see server/src/routes/tenantRoutes.js).
 // The access token is write-only here — the server never sends it back in
@@ -240,6 +241,8 @@ export default function WhatsAppSettingsView() {
         {message && <span className="text-sm text-gray-600 mr-3">{message}</span>}
       </form>
       )}
+
+      {canEdit && <WhatsAppTemplatesSettings />}
 
       {/* Where n8n forwards Meta's delivery statuses (server/src/routes/whatsappWebhookRoutes.js). */}
       {canEdit && forwardUrl && (

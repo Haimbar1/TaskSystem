@@ -51,6 +51,11 @@ async function fetchFromPortal(portalTenantId) {
   }
 }
 
+// After something else wrote a business's vault values (the WhatsApp system, whatsappSystemAccounts.js).
+export function forgetVaultCache(portalTenantId) {
+  cache.delete(Number(portalTenantId));
+}
+
 // SELECT * so this works where portal_tenant_id hasn't been added yet (portalProvision.js).
 async function tenantRow(tenantId) {
   const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);

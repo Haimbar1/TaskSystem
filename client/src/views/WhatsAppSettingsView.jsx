@@ -47,14 +47,15 @@ export default function WhatsAppSettingsView() {
     if (!source) return;
     const ok = window.confirm(
       `לעבור לשלוח מהמספר ${numberLabel(source)}?\n` +
-        `(WABA ${source.whatsapp_waba_id || 'ללא מזהה'} של "${source.tenant_name}")\n` +
+        `(WABA ${source.whatsapp_waba_id || 'ללא מזהה'}` +
+        `${source.account_name ? ` · ${source.account_name}` : ''}${source.tenant_name ? ` של "${source.tenant_name}"` : ''})\n` +
         'הטוקן, ה-WABA ID וה-Phone Number ID שלו יחליפו את הנוכחיים בעסק הזה.'
     );
     if (!ok) return;
     setTaking(true);
     setTakeMessage('');
     try {
-      const s = await api.takeWhatsAppFrom(source.tenant_id, source.whatsapp_phone_number_id);
+      const s = await api.takeWhatsAppFrom(source);
       applySettings(s);
       setAccessToken('');
       setSourceId('');
@@ -162,7 +163,7 @@ export default function WhatsAppSettingsView() {
                 const current = s.whatsapp_phone_number_id === phoneNumberId;
                 return (
                   <option key={s.whatsapp_phone_number_id} value={s.whatsapp_phone_number_id} disabled={current}>
-                    {numberLabel(s)} — {s.tenant_name}
+                    {numberLabel(s)} — {[s.account_name, s.tenant_name].filter(Boolean).join(' · ')}
                     {current ? ' (המספר הנוכחי)' : ''}
                   </option>
                 );

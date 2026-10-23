@@ -55,10 +55,10 @@ export const api = {
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
   getWhatsAppSources: () => request('/api/tenants/whatsapp-sources'),
-  takeWhatsAppFrom: (sourceTenantId, phoneNumberId) =>
+  takeWhatsAppFrom: ({ origin, tenant_id, whatsapp_phone_number_id }) =>
     request('/api/tenants/whatsapp-settings/take-from', {
       method: 'POST',
-      body: JSON.stringify({ sourceTenantId, phoneNumberId }),
+      body: JSON.stringify({ origin, sourceTenantId: tenant_id, phoneNumberId: whatsapp_phone_number_id }),
     }),
   getWhatsAppLog: () => request('/api/tenants/whatsapp-log'),
   getAuditLog: () => request('/api/tenants/audit-log'),

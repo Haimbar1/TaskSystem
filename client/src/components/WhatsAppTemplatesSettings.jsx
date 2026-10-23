@@ -112,6 +112,20 @@ export default function WhatsAppTemplatesSettings() {
           לכל הודעה שמערכת המשימות שולחת — באיזו תבנית מאושרת ב-Meta היא יוצאת, ומה נכנס בכל משתנה ({'{{1}}'},{' '}
           {'{{2}}'}…) של התבנית. לעסק הזה בלבד.
         </p>
+        {(() => {
+          // e.g. after switching the WABA: a chosen template the new WABA doesn't have will fail to send
+          if (!data.approved.length) return null;
+          const missing = data.events.filter((e) => {
+            const t = draft[e.key];
+            return t?.name && !data.approved.some((a) => a.name === t.name && a.language === t.language);
+          });
+          return missing.length ? (
+            <p className="text-amber-700 mt-1">
+              התבניות של {missing.map((e) => `"${e.label}"`).join(', ')} לא נמצאות ב-WABA הנוכחי — ההודעות האלה ייכשלו עד
+              שתבחרו להן תבנית מהרשימה.
+            </p>
+          ) : null;
+        })()}
         {data.approved_error && (
           <p className="text-amber-700 mt-1">
             לא הצלחנו לקרוא את התבניות מ-Meta: {data.approved_error}. אפשר להשאיר את ברירת המחדל.

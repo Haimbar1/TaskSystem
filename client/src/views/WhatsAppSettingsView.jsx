@@ -24,6 +24,8 @@ export default function WhatsAppSettingsView() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [sources, setSources] = useState([]);
+  // bumped after the WABA / number changes, so the templates section reloads the new WABA's templates
+  const [templatesKey, setTemplatesKey] = useState(0);
   const [sourceId, setSourceId] = useState('');
   const [taking, setTaking] = useState(false);
   const [takeMessage, setTakeMessage] = useState('');
@@ -63,6 +65,7 @@ export default function WhatsAppSettingsView() {
     try {
       const s = await api.takeWhatsAppFrom(source);
       applySettings(s);
+      setTemplatesKey((k) => k + 1);
       setAccessToken('');
       setSourceId('');
       setTakeMessage(
@@ -113,6 +116,7 @@ export default function WhatsAppSettingsView() {
         message_link_url: messageLink,
       });
       applySettings(s);
+      setTemplatesKey((k) => k + 1);
       setAccessToken('');
       setMessage(
         !s.linked || s.vault?.ok
@@ -261,7 +265,7 @@ export default function WhatsAppSettingsView() {
       </form>
       )}
 
-      {canEdit && <WhatsAppTemplatesSettings />}
+      {canEdit && <WhatsAppTemplatesSettings key={templatesKey} />}
 
       {/* Where n8n forwards Meta's delivery statuses (server/src/routes/whatsappWebhookRoutes.js). */}
       {canEdit && forwardUrl && (

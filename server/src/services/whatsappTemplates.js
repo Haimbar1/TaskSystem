@@ -89,8 +89,12 @@ export async function setTemplateSettings(tenantId, input) {
     const language = String(t.language || '').trim();
     const body = String(t.body || '');
     const params = Array.isArray(t.params) ? t.params.map(String) : [];
-    if (!/^[a-z0-9_]+$/.test(name) || !/^[A-Za-z_]{2,10}$/.test(language)) return `תבנית לא תקינה ל"${label}"`;
-    if (params.length !== variableCount(body)) return `יש לבחור מה נכנס בכל משתנה בתבנית של "${label}"`;
+    if (!/^[a-z0-9_]+$/.test(name)) return `שם התבנית של "${label}" יכול להכיל רק אותיות לועזיות קטנות, ספרות ו-_`;
+    if (!/^[A-Za-z_]{2,10}$/.test(language)) return `קוד השפה של "${label}" לא תקין (למשל he או en_US)`;
+    // A template typed in by name may come without its text: then the variables are as many as chosen.
+    if (body ? params.length !== variableCount(body) : params.length > 10) {
+      return `יש לבחור מה נכנס בכל משתנה בתבנית של "${label}"`;
+    }
     if (params.some((p) => !TEMPLATE_FIELDS[p])) return `ערך לא מוכר בתבנית של "${label}"`;
     clean[key] = { name, language, params, body };
   }
@@ -111,6 +115,10 @@ export async function templateFor(tenantId, eventType) {
     name: t.name,
     language: t.language || 'he',
     buildParams: (ctx) => t.params.map((key) => String(TEMPLATE_FIELDS[key]?.value(ctx) ?? '') || '—'),
-    render: (params) => t.body.replace(/\{\{(\d+)\}\}/g, (m, n) => params[Number(n) - 1] ?? m),
+    // for the outgoing log; a template saved without its text logs its name and values
+    render: (params) =>
+      t.body
+        ? t.body.replace(/\{\{(\d+)\}\}/g, (m, n) => params[Number(n) - 1] ?? m)
+        : [`[${t.name}]`, ...params].join('\n'),
   };
 }

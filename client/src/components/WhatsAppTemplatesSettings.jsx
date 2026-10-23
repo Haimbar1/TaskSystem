@@ -17,6 +17,8 @@ function variableCount(body) {
 export default function WhatsAppTemplatesSettings() {
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({});
+  // messages whose template is typed in by name (not picked from what Meta returned)
+  const [custom, setCustom] = useState({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -26,13 +28,37 @@ export default function WhatsAppTemplatesSettings() {
       .then((d) => {
         setData(d);
         setDraft(Object.fromEntries(d.events.map((e) => [e.key, d.settings[e.key] || d.defaults[e.key]])));
+        // a saved template Meta didn't list (and not the default) was typed in — keep editing it that way
+        setCustom(
+          Object.fromEntries(
+            d.events.map((e) => {
+              const t = d.settings[e.key];
+              const listed = t && d.approved.some((a) => a.name === t.name && a.language === t.language);
+              return [e.key, Boolean(t && !listed && t.name !== d.defaults[e.key].name)];
+            })
+          )
+        );
       })
       .catch((err) => setMessage(err.message || 'שגיאה בטעינת התבניות'));
   }, []);
 
   if (!data) return message ? <p className="text-sm text-red-600 mt-5">{message}</p> : null;
 
+  // Typed-in template: its text (optional) sets the variables; without it, their number does.
+  function editCustom(eventKey, patch) {
+    const t = { ...draft[eventKey], ...patch };
+    const count = t.body ? variableCount(t.body) : Math.min(10, Math.max(0, Number(patch.count ?? t.params.length) || 0));
+    t.params = Array.from({ length: count }, (_, i) => t.params[i] || '');
+    setDraft({ ...draft, [eventKey]: t });
+  }
+
   function chooseTemplate(eventKey, value) {
+    if (value === '__custom__') {
+      setCustom({ ...custom, [eventKey]: true });
+      setDraft({ ...draft, [eventKey]: { name: '', language: 'he', body: '', params: [] } });
+      return;
+    }
+    setCustom({ ...custom, [eventKey]: false });
     const [name, language] = value.split('|');
     const t =
       data.approved.find((a) => a.name === name && a.language === language) ||
@@ -52,6 +78,11 @@ export default function WhatsAppTemplatesSettings() {
   }
 
   async function save() {
+    const unnamed = data.events.find((e) => !draft[e.key].name.trim());
+    if (unnamed) {
+      setMessage(`יש להזין שם תבנית ל"${unnamed.label}"`);
+      return;
+    }
     const missing = data.events.find((e) => draft[e.key].params.some((p) => !p));
     if (missing) {
       setMessage(`יש לבחור מה נכנס בכל משתנה בתבנית של "${missing.label}"`);
@@ -92,6 +123,7 @@ export default function WhatsAppTemplatesSettings() {
         const t = draft[e.key];
         const def = data.defaults[e.key];
         const isDefault = sameTemplate(t, def);
+        const isCustom = custom[e.key];
         const inApproved = data.approved.some((a) => a.name === t.name && a.language === t.language);
         const preview = t.body.replace(/\{\{(\d+)\}\}/g, (m, n) => {
           const field = t.params[Number(n) - 1];
@@ -104,7 +136,10 @@ export default function WhatsAppTemplatesSettings() {
               {!isDefault && (
                 <button
                   type="button"
-                  onClick={() => setDraft({ ...draft, [e.key]: def })}
+                  onClick={() => {
+                    setDraft({ ...draft, [e.key]: def });
+                    setCustom({ ...custom, [e.key]: false });
+                  }}
                   className="text-xs text-gray-500 hover:underline"
                 >
                   חזרה לברירת המחדל
@@ -114,13 +149,13 @@ export default function WhatsAppTemplatesSettings() {
             <select
               dir="ltr"
               className="border rounded p-2 w-full bg-white"
-              value={`${t.name}|${t.language}`}
+              value={isCustom ? '__custom__' : `${t.name}|${t.language}`}
               onChange={(ev) => chooseTemplate(e.key, ev.target.value)}
             >
               {!data.approved.some((a) => a.name === def.name && a.language === def.language) && (
                 <option value={`${def.name}|${def.language}`}>{def.name} (ברירת המחדל)</option>
               )}
-              {!inApproved && !(t.name === def.name && t.language === def.language) && (
+              {!isCustom && !inApproved && !(t.name === def.name && t.language === def.language) && (
                 <option value={`${t.name}|${t.language}`}>{t.name} (לא נמצאה ב-WABA)</option>
               )}
               {data.approved.map((a) => (
@@ -129,7 +164,58 @@ export default function WhatsAppTemplatesSettings() {
                   {a.name === def.name ? ' (ברירת המחדל)' : ''}
                 </option>
               ))}
+              <option value="__custom__">✎ הקלדת שם תבנית…</option>
             </select>
+            {isCustom && (
+              <div className="space-y-2 border rounded p-2 bg-gray-50">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="sm:col-span-2">
+                    <span className="block text-xs text-gray-500 mb-1">שם התבנית בדיוק כמו ב-Meta</span>
+                    <input
+                      dir="ltr"
+                      className="border rounded p-1.5 w-full bg-white"
+                      placeholder="my_template_name"
+                      value={t.name}
+                      onChange={(ev) => editCustom(e.key, { name: ev.target.value.trim() })}
+                    />
+                  </label>
+                  <label>
+                    <span className="block text-xs text-gray-500 mb-1">שפה</span>
+                    <input
+                      dir="ltr"
+                      className="border rounded p-1.5 w-full bg-white"
+                      placeholder="he"
+                      value={t.language}
+                      onChange={(ev) => editCustom(e.key, { language: ev.target.value.trim() })}
+                    />
+                  </label>
+                </div>
+                <label className="block">
+                  <span className="block text-xs text-gray-500 mb-1">
+                    טקסט התבנית (לא חובה) — מדביקים כמו ב-Meta, עם {'{{1}}'}, {'{{2}}'}…; משמש לתצוגה וליומן ההודעות
+                  </span>
+                  <textarea
+                    rows={3}
+                    className="border rounded p-1.5 w-full bg-white"
+                    value={t.body}
+                    onChange={(ev) => editCustom(e.key, { body: ev.target.value })}
+                  />
+                </label>
+                {!t.body && (
+                  <label className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">מספר משתנים בתבנית</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      className="border rounded p-1.5 w-20 bg-white"
+                      value={t.params.length}
+                      onChange={(ev) => editCustom(e.key, { count: ev.target.value })}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
             {t.params.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {t.params.map((field, i) => (
@@ -151,7 +237,7 @@ export default function WhatsAppTemplatesSettings() {
                 ))}
               </div>
             )}
-            <p className="whitespace-pre-line text-gray-600 bg-gray-50 border rounded p-2">{preview}</p>
+            {preview && <p className="whitespace-pre-line text-gray-600 bg-gray-50 border rounded p-2">{preview}</p>}
           </div>
         );
       })}

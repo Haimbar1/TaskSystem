@@ -133,9 +133,6 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
-// BotApp's shared demo number (050-672-5398) belongs to no business, so it's never offered.
-const isDemoNumber = (display) => String(display || '').replace(/\D/g, '').slice(-9) === '506725398';
-
 // Super admin: every WhatsApp number the businesses' WABAs hold (this one included), as Meta shows
 // it, to move one into the active business by the number people know. A WABA several businesses
 // share is listed once. A business whose numbers Meta won't list still shows, by its Phone Number ID.
@@ -156,7 +153,7 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
     });
     const list = numbers.length ? numbers : [{ id: values.whatsapp_phone_number_id }];
     for (const n of list) {
-      if (seen.has(n.id) || isDemoNumber(n.display_phone_number)) continue;
+      if (seen.has(n.id)) continue;
       seen.add(n.id);
       sources.push({
         origin: 'tasks',
@@ -171,7 +168,6 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
   }
   const nameByPortalId = new Map(rows.filter((t) => t.portal_tenant_id).map((t) => [Number(t.portal_tenant_id), t.name]));
   for (const a of await listWhatsAppSystemAccounts()) {
-    if (isDemoNumber(a.displayPhoneNumber)) continue;
     if (seen.has(a.phoneNumberId)) {
       // Already listed from a business here: show it by the number and name the WhatsApp system knows.
       const listed = sources.find((s) => s.whatsapp_phone_number_id === a.phoneNumberId);

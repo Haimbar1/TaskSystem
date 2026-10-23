@@ -113,6 +113,49 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
 });
 
+// Super admin: the WABAs the other businesses send from, to move one into the active business
+// without retyping it. Only businesses with a full connection (token + Phone Number ID) are listed.
+router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
+  const { rows } = await pool.query('SELECT id, name FROM tenants WHERE id <> $1 ORDER BY name', [req.tenantId]);
+  const sources = [];
+  for (const t of rows) {
+    const { values } = await whatsappCredentials(t.id);
+    if (!values.whatsapp_access_token || !values.whatsapp_phone_number_id) continue;
+    sources.push({
+      tenant_id: t.id,
+      tenant_name: t.name,
+      whatsapp_waba_id: values.whatsapp_waba_id,
+      whatsapp_phone_number_id: values.whatsapp_phone_number_id,
+    });
+  }
+  res.json({ sources });
+});
+
+// Takes another business's WABA into the active business: its token, Phone Number ID and WABA ID
+// are saved here exactly as the settings form saves them (tenants row + portal vault). The other
+// business keeps its own copy — the vault is never cleared from here.
+router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
+  const sourceId = Number(req.body?.sourceTenantId);
+  if (!sourceId || sourceId === Number(req.tenantId)) return res.status(400).json({ error: 'בחרו עסק אחר' });
+  const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [sourceId]);
+  if (!rows[0]) return res.status(404).json({ error: 'העסק לא נמצא' });
+  const { values } = await whatsappCredentials(sourceId);
+  if (!values.whatsapp_access_token || !values.whatsapp_phone_number_id) {
+    return res.status(400).json({ error: 'לעסק הזה אין וואטסאפ מחובר' });
+  }
+  await pool.query(
+    `UPDATE tenants SET whatsapp_access_token = $1, whatsapp_phone_number_id = $2, whatsapp_waba_id = $3 WHERE id = $4`,
+    [values.whatsapp_access_token, values.whatsapp_phone_number_id, values.whatsapp_waba_id || '', req.tenantId]
+  );
+  const vault = await writeToVault(req.tenantId, values, req.user?.email);
+  if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
+  await recordAction(req, {
+    action: 'settings_changed',
+    details: `וואטסאפ: הועבר WABA ${values.whatsapp_waba_id || '(ללא מזהה)'} מהעסק "${rows[0].name}"`,
+  });
+  res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
+});
+
 // The active business's task statuses (services/taskStatuses.js). Everyone needs them for the
 // board; only the business's admins change them.
 router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {

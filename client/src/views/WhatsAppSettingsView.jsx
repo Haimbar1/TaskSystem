@@ -22,6 +22,50 @@ export default function WhatsAppSettingsView() {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [sources, setSources] = useState([]);
+  const [sourceId, setSourceId] = useState('');
+  const [taking, setTaking] = useState(false);
+  const [takeMessage, setTakeMessage] = useState('');
+
+  function applySettings(s) {
+    setTokenSet(s.whatsapp_access_token_set);
+    setPhoneNumberId(s.whatsapp_phone_number_id);
+    setWabaId(s.whatsapp_waba_id);
+    setMessageLink(s.message_link_url || '');
+  }
+
+  // Super admin: move another business's WABA (with its token and Phone Number ID) into this one.
+  async function handleTake() {
+    const source = sources.find((s) => String(s.tenant_id) === sourceId);
+    if (!source) return;
+    const ok = window.confirm(
+      `להעביר לעסק הזה את ה-WABA ${source.whatsapp_waba_id || ''} של "${source.tenant_name}"?\n` +
+        'הטוקן וה-Phone Number ID שלו יחליפו את הנוכחיים, וההודעות של העסק הזה יישלחו מהמספר שלו.'
+    );
+    if (!ok) return;
+    setTaking(true);
+    setTakeMessage('');
+    try {
+      const s = await api.takeWhatsAppFrom(source.tenant_id);
+      applySettings(s);
+      setAccessToken('');
+      setSourceId('');
+      setTakeMessage(
+        !s.linked || s.vault?.ok
+          ? `ה-WABA של "${source.tenant_name}" הועבר לעסק הזה`
+          : 'הועבר כאן, אבל השמירה בפורטל נכשלה — נסו שוב או עדכנו בפורטל ב"מזהים וחיבורים"'
+      );
+    } catch (err) {
+      setTakeMessage(err.message?.startsWith('API error') ? 'שגיאה בהעברה' : err.message || 'שגיאה בהעברה');
+      console.error(err);
+    } finally {
+      setTaking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (canEdit) api.getWhatsAppSources().then((r) => setSources(r.sources || [])).catch(console.error);
+  }, [canEdit]);
 
   function load() {
     api.getWhatsAppSettings().then((s) => {
@@ -55,10 +99,7 @@ export default function WhatsAppSettingsView() {
         whatsapp_waba_id: wabaId,
         message_link_url: messageLink,
       });
-      setTokenSet(s.whatsapp_access_token_set);
-      setPhoneNumberId(s.whatsapp_phone_number_id);
-      setWabaId(s.whatsapp_waba_id);
-      setMessageLink(s.message_link_url || '');
+      applySettings(s);
       setAccessToken('');
       setMessage(
         !s.linked || s.vault?.ok
@@ -93,6 +134,38 @@ export default function WhatsAppSettingsView() {
               : 'וואטסאפ עדיין לא מחובר לעסק — לא נשלחות הודעות.'}
           </p>
           <p className="text-gray-500">שינוי ההגדרות נעשה על ידי מנהל המערכת בלבד.</p>
+        </div>
+      )}
+      {canEdit && sources.length > 0 && (
+        <div className="mb-4 border rounded-lg p-3 bg-gray-50 space-y-2">
+          <h3 className="font-semibold text-sm">החלפת WABA</h3>
+          <p className="text-xs text-gray-500">
+            בחרו WABA של עסק אחר — הטוקן וה-Phone Number ID שלו עוברים איתו לעסק הזה. העסק השני ממשיך לשלוח ממנו.
+          </p>
+          <div className="flex gap-2">
+            <select
+              className="border rounded p-2 w-full bg-white text-sm"
+              value={sourceId}
+              onChange={(e) => setSourceId(e.target.value)}
+            >
+              <option value="">בחרו WABA…</option>
+              {sources.map((s) => (
+                <option key={s.tenant_id} value={s.tenant_id}>
+                  {s.tenant_name} — WABA {s.whatsapp_waba_id || 'ללא מזהה'}
+                  {s.whatsapp_waba_id === wabaId && s.whatsapp_phone_number_id === phoneNumberId ? ' (הנוכחי)' : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleTake}
+              disabled={!sourceId || taking}
+              className="px-3 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-50 whitespace-nowrap"
+            >
+              {taking ? 'מעביר…' : 'העבר לכאן'}
+            </button>
+          </div>
+          {takeMessage && <p className="text-sm text-gray-600">{takeMessage}</p>}
         </div>
       )}
       {canEdit && (

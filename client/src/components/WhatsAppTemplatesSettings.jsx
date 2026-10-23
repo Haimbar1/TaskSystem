@@ -128,7 +128,7 @@ export default function WhatsAppTemplatesSettings() {
         })()}
         {data.approved_error && (
           <p className="text-amber-700 mt-1">
-            לא הצלחנו לקרוא את התבניות מ-Meta: {data.approved_error}. אפשר להשאיר את ברירת המחדל.
+            לא הצלחנו לקרוא את התבניות מ-Meta: {data.approved_error}
           </p>
         )}
       </div>

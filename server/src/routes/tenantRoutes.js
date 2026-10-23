@@ -266,11 +266,22 @@ router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireS
 // (services/whatsappTemplates.js). Super admin, like the rest of the WhatsApp settings. GET also
 // returns the business's WABA's approved templates to choose from.
 router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
-  const { values } = await whatsappCredentials(req.tenantId);
+  const { values, sources } = await whatsappCredentials(req.tenantId);
   const approved = await listApprovedTemplates({
     accessToken: values.whatsapp_access_token,
     wabaId: values.whatsapp_waba_id,
   });
+  // Meta's "does not exist / missing permissions" on the WABA = the token can't see this WABA. Say
+  // so in plain words, with where each value comes from (the token and WABA ID may come from
+  // different places — see tenantSecrets.js).
+  if (approved.error && /does not exist|missing permissions/i.test(approved.error)) {
+    const where = { env: 'הגדרות השרת (Vercel)', vault: 'הפורטל ("מזהים וחיבורים")', local: 'מערכת המשימות' };
+    approved.error =
+      `ה-Access Token השמור לא מקבל גישה ל-WABA ${values.whatsapp_waba_id}. ` +
+      `הטוקן מגיע מ${where[sources.whatsapp_access_token] || '—'} וה-WABA ID מ${where[sources.whatsapp_waba_id] || '—'}. ` +
+      'צריך טוקן של ה-Meta Business שה-WABA הזה שייך לו (System User עם ההרשאות whatsapp_business_messaging ' +
+      'ו-whatsapp_business_management על ה-WABA) — מדביקים אותו בשדה Access Token ושומרים.';
+  }
   res.json({
     events: TEMPLATE_EVENTS,
     fields: Object.fromEntries(Object.entries(TEMPLATE_FIELDS).map(([key, f]) => [key, f.label])),

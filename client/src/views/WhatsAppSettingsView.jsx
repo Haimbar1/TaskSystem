@@ -4,6 +4,15 @@ import { useAppContext } from '../context/AppContext.jsx';
 import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 import WhatsAppTemplatesSettings from '../components/WhatsAppTemplatesSettings.jsx';
 
+// Where a value the business sends with comes from (server/src/tenantSecrets.js): the server's
+// environment wins for the original business, then the portal vault, then this app's own row — so a
+// token and a WABA ID can come from different places, and not match.
+const SOURCE_LABELS = { env: 'מהגדרות השרת (Vercel)', vault: 'מהפורטל', local: 'ממערכת המשימות' };
+function SourceNote({ source }) {
+  if (!SOURCE_LABELS[source]) return null;
+  return <span className="text-xs text-gray-400 mr-1">· {SOURCE_LABELS[source]}</span>;
+}
+
 // Per-business WhatsApp Business credentials (see server/src/routes/tenantRoutes.js).
 // The access token is write-only here — the server never sends it back in
 // full, only whether one is set — so the field starts blank even when a
@@ -33,7 +42,10 @@ export default function WhatsAppSettingsView() {
   const [wabaNumbers, setWabaNumbers] = useState([]);
   const [phoneNotInWaba, setPhoneNotInWaba] = useState(false);
 
+  const [valueSources, setValueSources] = useState({});
+
   function applySettings(s) {
+    setValueSources(s.sources || {});
     setWabaNumbers(s.waba_numbers || []);
     setPhoneNotInWaba(!!s.phone_not_in_waba);
     setTokenSet(s.whatsapp_access_token_set);
@@ -194,6 +206,7 @@ export default function WhatsAppSettingsView() {
         <div>
           <label className="block text-sm mb-1">
             Access Token {tokenSet && <span className="text-green-600">(מוגדר)</span>}
+            <SourceNote source={valueSources.whatsapp_access_token} />
           </label>
           <input
             type="password"
@@ -204,7 +217,9 @@ export default function WhatsAppSettingsView() {
           />
         </div>
         <div>
-          <label className="block text-sm mb-1">Phone Number ID</label>
+          <label className="block text-sm mb-1">
+            Phone Number ID <SourceNote source={valueSources.whatsapp_phone_number_id} />
+          </label>
           <input
             className="border rounded p-2 w-full"
             value={phoneNumberId}
@@ -212,7 +227,9 @@ export default function WhatsAppSettingsView() {
           />
         </div>
         <div>
-          <label className="block text-sm mb-1">WABA ID</label>
+          <label className="block text-sm mb-1">
+            WABA ID <SourceNote source={valueSources.whatsapp_waba_id} />
+          </label>
           <input
             className="border rounded p-2 w-full"
             value={wabaId}

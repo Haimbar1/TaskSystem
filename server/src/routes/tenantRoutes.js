@@ -6,7 +6,7 @@ import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '.
 import { whatsappCredentials, writeToVault, forgetVaultCache } from '../tenantSecrets.js';
 import { listWhatsAppSystemAccounts, moveAccountToVault } from '../services/whatsappSystemAccounts.js';
 import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
-import { listPhoneNumbers, listApprovedTemplates } from '../services/whatsapp.js';
+import { listPhoneNumbers, listApprovedTemplates, wabaOfPhone } from '../services/whatsapp.js';
 import {
   TEMPLATE_EVENTS,
   TEMPLATE_FIELDS,
@@ -87,12 +87,20 @@ async function whatsappSettingsResponse(tenantId, extra = {}) {
     values.whatsapp_access_token && values.whatsapp_waba_id
       ? await listPhoneNumbers({ accessToken: values.whatsapp_access_token, wabaId: values.whatsapp_waba_id })
       : [];
+  const phoneNotInWaba =
+    wabaNumbers.length > 0 &&
+    !!values.whatsapp_phone_number_id &&
+    !wabaNumbers.some((n) => n.id === values.whatsapp_phone_number_id);
   return {
     waba_numbers: wabaNumbers.map((n) => ({ id: n.id, display_phone_number: n.display_phone_number || '' })),
-    phone_not_in_waba:
-      wabaNumbers.length > 0 &&
-      !!values.whatsapp_phone_number_id &&
-      !wabaNumbers.some((n) => n.id === values.whatsapp_phone_number_id),
+    phone_not_in_waba: phoneNotInWaba,
+    // the WABA the number is really in, to offer instead of the saved one
+    phone_waba_id: phoneNotInWaba
+      ? (await wabaOfPhone({
+          accessToken: values.whatsapp_access_token,
+          phoneNumberId: values.whatsapp_phone_number_id,
+        })) || ''
+      : '',
     whatsapp_access_token_set: !!values.whatsapp_access_token,
     whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
     whatsapp_waba_id: values.whatsapp_waba_id || '',
@@ -267,17 +275,22 @@ router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireS
 // returns the business's WABA's approved templates to choose from.
 router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   const { values, sources } = await whatsappCredentials(req.tenantId);
-  const approved = await listApprovedTemplates({
+  // Templates come from the WABA the sending number is in (wabaOfPhone) — a template from any other
+  // WABA fails to send with "does not exist or isn't approved".
+  const phoneWaba = await wabaOfPhone({
     accessToken: values.whatsapp_access_token,
+    phoneNumberId: values.whatsapp_phone_number_id,
     wabaId: values.whatsapp_waba_id,
   });
+  const templatesWaba = phoneWaba || values.whatsapp_waba_id;
+  const approved = await listApprovedTemplates({ accessToken: values.whatsapp_access_token, wabaId: templatesWaba });
   // Meta's "does not exist / missing permissions" on the WABA = the token can't see this WABA. Say
   // so in plain words, with where each value comes from (the token and WABA ID may come from
   // different places — see tenantSecrets.js).
   if (approved.error && /does not exist|missing permissions/i.test(approved.error)) {
     const where = { env: 'הגדרות השרת (Vercel)', vault: 'הפורטל ("מזהים וחיבורים")', local: 'מערכת המשימות' };
     approved.error =
-      `ה-Access Token השמור לא מקבל גישה ל-WABA ${values.whatsapp_waba_id}. ` +
+      `ה-Access Token השמור לא מקבל גישה ל-WABA ${templatesWaba}. ` +
       `הטוקן מגיע מ${where[sources.whatsapp_access_token] || '—'} וה-WABA ID מ${where[sources.whatsapp_waba_id] || '—'}. ` +
       'צריך טוקן של ה-Meta Business שה-WABA הזה שייך לו (System User עם ההרשאות whatsapp_business_messaging ' +
       'ו-whatsapp_business_management על ה-WABA) — מדביקים אותו בשדה Access Token ושומרים.';
@@ -289,6 +302,10 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
     settings: await getTemplateSettings(req.tenantId),
     approved: approved.templates || [],
     approved_error: approved.error || '',
+    templates_waba_id: templatesWaba || '',
+    saved_waba_id: values.whatsapp_waba_id || '',
+    // the saved WABA ID names a WABA the sending number isn't in
+    waba_mismatch: Boolean(phoneWaba && values.whatsapp_waba_id && phoneWaba !== values.whatsapp_waba_id),
   });
 });
 

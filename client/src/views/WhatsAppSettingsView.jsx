@@ -41,6 +41,7 @@ export default function WhatsAppSettingsView() {
 
   const [wabaNumbers, setWabaNumbers] = useState([]);
   const [phoneNotInWaba, setPhoneNotInWaba] = useState(false);
+  const [phoneWabaId, setPhoneWabaId] = useState('');
 
   const [valueSources, setValueSources] = useState({});
 
@@ -48,6 +49,7 @@ export default function WhatsAppSettingsView() {
     setValueSources(s.sources || {});
     setWabaNumbers(s.waba_numbers || []);
     setPhoneNotInWaba(!!s.phone_not_in_waba);
+    setPhoneWabaId(s.phone_waba_id || '');
     setTokenSet(s.whatsapp_access_token_set);
     setPhoneNumberId(s.whatsapp_phone_number_id);
     setWabaId(s.whatsapp_waba_id);
@@ -237,7 +239,17 @@ export default function WhatsAppSettingsView() {
           />
           {phoneNotInWaba && (
             <div className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 space-y-1">
-              <p>ה-Phone Number ID השמור לא שייך ל-WABA הזה. המספרים של ה-WABA לפי Meta:</p>
+              <p>ה-Phone Number ID השמור לא שייך ל-WABA הזה.</p>
+              {phoneWabaId && (
+                <button
+                  type="button"
+                  onClick={() => setWabaId(phoneWabaId)}
+                  className="block text-right underline hover:no-underline"
+                >
+                  לפי Meta המספר שייך ל-WABA <span dir="ltr">{phoneWabaId}</span> — השתמש ב-WABA הזה
+                </button>
+              )}
+              <p>או לבחור מספר אחר מה-WABA השמור (לפי Meta):</p>
               {wabaNumbers.map((n) => (
                 <button
                   key={n.id}

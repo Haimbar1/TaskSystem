@@ -112,6 +112,17 @@ export default function WhatsAppTemplatesSettings() {
           לכל הודעה שמערכת המשימות שולחת — באיזו תבנית מאושרת ב-Meta היא יוצאת, ומה נכנס בכל משתנה ({'{{1}}'},{' '}
           {'{{2}}'}…) של התבנית. לעסק הזה בלבד.
         </p>
+        {data.templates_waba_id && (
+          <p className="text-gray-500 mt-1">
+            התבניות נטענות מ-WABA <span dir="ltr">{data.templates_waba_id}</span> — ה-WABA שהמספר השולח שייך אליו.
+          </p>
+        )}
+        {data.waba_mismatch && (
+          <p className="text-amber-700 mt-1">
+            ה-WABA ID השמור בהגדרות (<span dir="ltr">{data.saved_waba_id}</span>) לא תואם למספר השולח. כדאי לתקן אותו
+            ל-<span dir="ltr">{data.templates_waba_id}</span> ולשמור.
+          </p>
+        )}
         {(() => {
           // e.g. after switching the WABA: a chosen template the new WABA doesn't have will fail to send
           if (!data.approved.length) return null;

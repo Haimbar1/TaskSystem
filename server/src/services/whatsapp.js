@@ -40,6 +40,34 @@ export async function listPhoneNumbers({ accessToken, wabaId, phoneNumberId }) {
   }
 }
 
+// The WABA a phone number really belongs to, as Meta has it. A template only sends from a number
+// of the WABA it was approved in (else Meta: 132001 "does not exist"), so the template list must
+// come from this WABA — not from a saved WABA ID that may name another one (Haim, 2026-10-24:
+// עסק חכם's number is in WABA 4163610273938786, its saved WABA ID was Haim Bar's). Tries the saved
+// WABA first, then every WABA the token is granted. null = Meta didn't say.
+export async function wabaOfPhone({ accessToken, phoneNumberId, wabaId }) {
+  if (!accessToken || !phoneNumberId) return null;
+  const holds = async (id) => (await listPhoneNumbers({ accessToken, wabaId: id })).some((n) => n.id === phoneNumberId);
+  if (wabaId && (await holds(wabaId))) return wabaId;
+  try {
+    const res = await fetch(
+      `${GRAPH_API_URL}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(accessToken)}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const data = await res.json().catch(() => ({}));
+    const candidates = new Set();
+    for (const s of data?.data?.granular_scopes || []) {
+      if (s.scope === 'whatsapp_business_management' || s.scope === 'whatsapp_business_messaging') {
+        for (const id of s.target_ids || []) if (id !== wabaId) candidates.add(String(id));
+      }
+    }
+    for (const id of candidates) if (await holds(id)) return id;
+  } catch (err) {
+    console.warn('[whatsapp] finding the number\'s WABA failed:', err?.message);
+  }
+  return null;
+}
+
 // The WABA's approved templates the task system can send: only ones whose variables are all in the
 // body (a header or button variable, or a media header, needs values it can't fill). Returns
 // { templates: [{ name, language, category, body }] } or { error } (Meta's message).
@@ -88,10 +116,17 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
   if (!template) return null;
 
   // The portal vault's values (see tenantSecrets.js); only the original business falls back to env.
-  const { values: tenantCreds } = await whatsappCredentials(tenantId);
+  const { values: tenantCreds, sources: credSources } = await whatsappCredentials(tenantId);
   const accessToken = tenantCreds.whatsapp_access_token;
   const phoneNumberId = tenantCreds.whatsapp_phone_number_id;
   if (!accessToken || !phoneNumberId) return null;
+  // Added to a failed send's error in the log: exactly what was sent to Meta, to find a mismatch
+  // (a template from another WABA, a number from another WABA, a token from elsewhere).
+  const SOURCE = { env: 'Vercel', vault: 'הפורטל', local: 'מערכת המשימות' };
+  const sentWith = () =>
+    `[Phone Number ID ${phoneNumberId} · WABA ${tenantCreds.whatsapp_waba_id || '—'} · ` +
+    `תבנית ${template.name} (${template.language}) · ` +
+    `טוקן …${String(accessToken).slice(-6)} מ${SOURCE[credSources.whatsapp_access_token] || '—'}]`;
 
   const { rows: userRows } = await pool.query('SELECT name, phone, tenant_id FROM users WHERE id = $1', [userId]);
   const recipient = userRows[0];
@@ -165,6 +200,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
       error = e
         ? [e.code && `(${e.code})`, e.error_user_msg || e.message, e.error_data?.details].filter(Boolean).join(' ')
         : `HTTP ${res.status}`;
+      error = `${error} ${sentWith()}`;
       console.error('WhatsApp send failed', message.to, message.templateName, error);
     }
   } catch (err) {

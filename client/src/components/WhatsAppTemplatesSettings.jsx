@@ -171,6 +171,7 @@ export default function WhatsAppTemplatesSettings() {
                 </button>
               )}
             </div>
+            {e.when && <p className="text-xs text-gray-500">{e.when}</p>}
             <select
               dir="ltr"
               className="border rounded p-2 w-full bg-white"

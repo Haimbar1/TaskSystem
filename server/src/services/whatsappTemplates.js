@@ -8,11 +8,30 @@ import { PRIORITY_LABELS } from '../labels.js';
 // business's WABA on the "הגדרות וואטסאפ" screen (tenants.whatsapp_templates).
 
 // The messages, in the order the settings screen shows them (eventType as passed to whatsapp.js).
+// when: when it goes out and to whom, shown under the label (only users with a phone get any).
 export const TEMPLATE_EVENTS = [
-  { key: 'assigned', label: 'משימה חדשה / שינוי אחראים' },
-  { key: 'status_changed', label: 'שינוי סטטוס' },
-  { key: 'field_changed', label: 'עדכון משימה (עדיפות, כותרת, תיאור, תאריך יעד)' },
-  { key: 'overdue_reminder', label: 'משימה באיחור' },
+  {
+    key: 'assigned',
+    label: 'משימה חדשה / שינוי אחראים',
+    when: 'מיד כשנוצרת משימה או כשמשתנים האחראים — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+  },
+  {
+    key: 'status_changed',
+    label: 'שינוי סטטוס',
+    when: 'מיד כשהסטטוס משתנה — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+  },
+  {
+    key: 'field_changed',
+    label: 'עדכון משימה (עדיפות, כותרת, תיאור, תאריך יעד)',
+    when: 'מיד כשאחד השדות משתנה — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+  },
+  {
+    key: 'overdue_reminder',
+    label: 'משימה באיחור',
+    when:
+      'בדיקה אוטומטית כל בוקר בסביבות 08:00 (09:00 בשעון קיץ): משימה שתאריך היעד שלה עבר — כלומר מהבוקר ' +
+      'שאחרי תאריך היעד — ושאינה בסטטוס סיום או "מושהה". נשלחת לאחראים על המשימה, פעם ביום, כל יום עד שהיא מסתיימת.',
+  },
 ];
 
 // What a variable can be filled with. ctx: { recipientName, task, dueDate, statusLabel, link,

@@ -5,14 +5,24 @@ import { ensureStatusSchema, DEFAULT_STATUSES } from '../services/taskStatuses.j
 
 const router = Router();
 
-// Called once a day by an n8n workflow (per the spec doc) instead of a
-// platform cron job. Protected by a shared secret, not a user session.
-router.post('/check-overdue', async (req, res) => {
-  if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
+// The daily overdue check. Run by the Vercel cron in vercel.json — every day at 06:00 UTC (08:00
+// Israel in winter, 09:00 in summer; Vercel may fire it any time within that hour). Vercel calls it
+// with GET and "Authorization: Bearer <CRON_SECRET>"; an n8n workflow can still POST with
+// x-cron-secret. Protected by that shared secret, not a user session.
+function authorized(req) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers['x-cron-secret'] === secret || req.headers.authorization === `Bearer ${secret}`;
+}
+
+async function checkOverdue(req, res) {
+  if (!authorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Not for completed tasks (any ending status of the business, see taskStatuses.js) or paused ones.
+  // Overdue = the due date is before today (UTC — at 06:00 UTC that's the Israeli date too), so a
+  // task due yesterday gets its first reminder this morning, and one every morning after until it
+  // reaches an ending status of the business (see taskStatuses.js) or is paused.
   await ensureStatusSchema();
   const { rows: overdueTasks } = await pool.query(
     `SELECT t.* FROM tasks t JOIN tenants tn ON tn.id = t.tenant_id
@@ -26,8 +36,15 @@ router.post('/check-overdue', async (req, res) => {
 
   const whatsappMessages = [];
   for (const task of overdueTasks) {
+    // To the task's assignees (only those with a phone get the WhatsApp — see whatsapp.js) — not
+    // to whoever opened it. Once a day each: a second run the same day (cron + n8n, a retry) skips.
     const { rows: assignees } = await pool.query(
-      'SELECT user_id FROM task_assignees WHERE task_id = $1',
+      `SELECT a.user_id FROM task_assignees a
+       WHERE a.task_id = $1 AND NOT EXISTS (
+         SELECT 1 FROM notifications n
+         WHERE n.task_id = a.task_id AND n.user_id = a.user_id AND n.type = 'overdue_reminder'
+           AND n.created_at >= CURRENT_DATE
+       )`,
       [task.id]
     );
     for (const { user_id } of assignees) {
@@ -47,6 +64,9 @@ router.post('/check-overdue', async (req, res) => {
   }
 
   res.json({ checked: overdueTasks.length, whatsappMessages });
-});
+}
+
+router.get('/check-overdue', checkOverdue);
+router.post('/check-overdue', checkOverdue);
 
 export default router;

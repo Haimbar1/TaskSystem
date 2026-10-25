@@ -70,7 +70,7 @@ export const DEFAULT_TEMPLATES = {
     name: 'task_overdue',
     language: 'he',
     params: ['task_title', 'status', 'due_date', 'link'],
-    body: 'שלום,\nהמשימה {{1}} עדיין במצב {{2}}\nתאריך היעד שלה הוא {{3}}\nקישור למשימה {{4}}',
+    body: 'שלום,\nהמשימה {{1}} עדיין במצב {{2}}\nתאריך היעד שלה הוא {{3}}\nקישור למשימה{{4}},\nלטיפולך',
   },
 };
 
@@ -133,7 +133,13 @@ export async function templateFor(tenantId, eventType) {
   return {
     name: t.name,
     language: t.language || 'he',
-    buildParams: (ctx) => t.params.map((key) => String(TEMPLATE_FIELDS[key]?.value(ctx) ?? '') || '—'),
+    // A link always gets a space before it: a template written "קישור למשימה{{4}}" (task_overdue in
+    // Meta is) glues it to the word, and WhatsApp on phones then links only part of the address.
+    buildParams: (ctx) =>
+      t.params.map((key) => {
+        const value = String(TEMPLATE_FIELDS[key]?.value(ctx) ?? '') || '—';
+        return key === 'link' && value !== '—' ? ` ${value}` : value;
+      }),
     // for the outgoing log; a template saved without its text logs its name and values
     render: (params) =>
       t.body

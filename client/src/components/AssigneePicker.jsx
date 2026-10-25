@@ -5,9 +5,14 @@ const MENU_MAX_HEIGHT = 256;
 // The list opens fixed on top of the page (the table around it clips anything that sticks out),
 // collects ticks while open, and saves once when it closes — every save also sends WhatsApp
 // updates, so saving on each tick would message people about every intermediate state.
-export default function AssigneePicker({ users, selectedIds, onChange }) {
+// block: fills the width of its row (the task form) instead of sitting inline in a table cell.
+// With many people the list gets a search box.
+const SEARCH_FROM = 8;
+
+export default function AssigneePicker({ users, selectedIds, onChange, block = false }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(selectedIds);
+  const [search, setSearch] = useState('');
   const [pos, setPos] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -26,6 +31,7 @@ export default function AssigneePicker({ users, selectedIds, onChange }) {
         : { top: r.bottom + 4, maxHeight: Math.min(MENU_MAX_HEIGHT, below - 8) }),
     });
     setDraft(selectedIds);
+    setSearch('');
     openRef.current = true;
     setOpen(true);
   }
@@ -45,7 +51,10 @@ export default function AssigneePicker({ users, selectedIds, onChange }) {
       if (!menuRef.current?.contains(e.target) && !buttonRef.current?.contains(e.target)) closeMenu();
     }
     function onKey(e) {
-      if (e.key === 'Escape' || e.key === 'Enter') closeMenu();
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault(); // inside the task form, Enter would also submit it
+        closeMenu();
+      }
     }
     // the list is pinned to where the button was, so close it once the page moves under it
     function onScroll(e) {
@@ -70,15 +79,25 @@ export default function AssigneePicker({ users, selectedIds, onChange }) {
     setDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
   }
 
+  const term = search.trim().toLowerCase();
+  const shownUsers = term
+    ? users.filter((u) => `${u.name || ''} ${u.email || ''}`.toLowerCase().includes(term))
+    : users;
+
   return (
-    <div className="inline-block">
+    <div className={block ? 'block' : 'inline-block'}>
       <button
         ref={buttonRef}
         type="button"
         onClick={() => (open ? closeMenu() : openMenu())}
-        className="border rounded px-2 py-1 text-sm text-right min-w-[100px] bg-white"
+        className={`border rounded text-sm text-right bg-white ${
+          block ? 'w-full p-2 flex items-center justify-between gap-2' : 'px-2 py-1 min-w-[100px]'
+        }`}
       >
-        {selectedNames.length ? selectedNames.join(', ') : 'לא משויך'}
+        <span className={selectedNames.length ? '' : 'text-gray-500'}>
+          {selectedNames.length ? selectedNames.join(', ') : 'לא משויך'}
+        </span>
+        {block && <span className="text-gray-400 text-xs">▾</span>}
       </button>
       {open && pos && (
         <div
@@ -87,7 +106,16 @@ export default function AssigneePicker({ users, selectedIds, onChange }) {
           style={pos}
           className="fixed z-50 bg-white border rounded shadow-lg p-2 overflow-y-auto"
         >
-          {users.map((u) => (
+          {users.length >= SEARCH_FROM && (
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="חיפוש…"
+              className="w-full border rounded px-2 py-1 text-sm mb-1"
+            />
+          )}
+          {shownUsers.map((u) => (
             <label key={u.id} className="flex items-center gap-2 text-sm py-1 whitespace-nowrap cursor-pointer">
               <input type="checkbox" checked={draft.includes(u.id)} onChange={() => toggle(u.id)} />
               {u.name || u.email}

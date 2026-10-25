@@ -9,21 +9,26 @@ import { PRIORITY_LABELS } from '../labels.js';
 
 // The messages, in the order the settings screen shows them (eventType as passed to whatsapp.js).
 // when: when it goes out and to whom, shown under the label (only users with a phone get any).
+// Mirrors recipientsFor in notifications.js — keep in sync.
 export const TEMPLATE_EVENTS = [
   {
     key: 'assigned',
     label: 'משימה חדשה / שינוי אחראים',
-    when: 'מיד כשנוצרת משימה או כשמשתנים האחראים — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+    when:
+      'מיד כשמשייכים אחראי — ביצירת משימה עם אחראים, או כשמוסיפים אחראי למשימה קיימת. רק למי שקיבל עכשיו את המשימה ' +
+      '(לא לאחראים שכבר היו, לא למי שפתח אותה ולא למי שביצע את השינוי). משימה בלי אחראים לא שולחת שום הודעה.',
   },
   {
     key: 'status_changed',
     label: 'שינוי סטטוס',
-    when: 'מיד כשהסטטוס משתנה — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+    when: 'מיד כשהסטטוס משתנה, אם יש למשימה אחראים — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
   },
   {
     key: 'field_changed',
-    label: 'עדכון משימה (עדיפות, כותרת, תיאור, תאריך יעד)',
-    when: 'מיד כשאחד השדות משתנה — לאחראים ולמי שפתח את המשימה (לא למי שביצע את השינוי).',
+    label: 'עדכון תיאור המשימה',
+    when:
+      'מיד כשטקסט התיאור משתנה (כולל סימון שורה כ"בוצע") — רק לאחראים על המשימה (לא למי שביצע את השינוי). ' +
+      'שינוי כותרת, עדיפות או תאריך יעד לא שולח הודעה.',
   },
   {
     key: 'overdue_reminder',

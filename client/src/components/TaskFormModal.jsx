@@ -5,6 +5,8 @@ import { PRIORITY_LABELS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
 import TaskNotes from './TaskNotes.jsx';
+import AssigneePicker from './AssigneePicker.jsx';
+import { isDoneLine, lineText, toggleLine } from '../descriptionLines.js';
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
@@ -17,6 +19,8 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   const [usersError, setUsersError] = useState('');
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
+  // An existing task opens its description as lines to tick; a new one as text to type.
+  const [editingText, setEditingText] = useState(!isEdit);
   const [priority, setPriority] = useState(task?.priority || 'normal');
   const [dueDate, setDueDate] = useState(toDateInputValue(task?.due_date));
   const [assigneeIds, setAssigneeIds] = useState((task?.assignees || []).map((a) => a.id));
@@ -37,10 +41,6 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
       })
       .catch((err) => setUsersError(err.message));
   }, []);
-
-  function toggleAssignee(id) {
-    setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -158,13 +158,47 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         </div>
 
         <div>
-          <label className="block text-sm mb-1">תיאור</label>
-          <textarea
-            className="w-full border rounded p-2 resize-y"
-            rows={6}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm">תיאור</label>
+            {description.trim() && (
+              <button
+                type="button"
+                onClick={() => setEditingText((v) => !v)}
+                className="text-xs text-emerald-700 hover:underline"
+              >
+                {editingText ? '☑ סימון שורות כבוצע' : '✏️ עריכת הטקסט'}
+              </button>
+            )}
+          </div>
+          {editingText || !description.trim() ? (
+            <textarea
+              className="w-full border rounded p-2 resize-y"
+              rows={6}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          ) : (
+            // Each line gets a tick box; ticking marks it done (descriptionLines.js), saved with "שמור".
+            <div className="border rounded p-2 space-y-1 max-h-80 overflow-y-auto">
+              {description.split('\n').map((line, i) =>
+                line.trim() ? (
+                  <label key={i} className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={isDoneLine(line)}
+                      onChange={() => setDescription((d) => toggleLine(d, i))}
+                    />
+                    <span className={`whitespace-pre-wrap ${isDoneLine(line) ? 'line-through text-gray-400' : ''}`}>
+                      {lineText(line)}
+                    </span>
+                  </label>
+                ) : (
+                  <div key={i} className="h-2" />
+                )
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3">
@@ -200,18 +234,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
           ) : users.length === 0 ? (
             <p className="text-gray-500 text-sm">אין עדיין משתמשים בעסק הזה. אפשר להוסיף במסך "משתמשים".</p>
           ) : (
-            <div className="border rounded p-2 max-h-32 overflow-y-auto space-y-1">
-              {users.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={assigneeIds.includes(u.id)}
-                    onChange={() => toggleAssignee(u.id)}
-                  />
-                  {u.name || u.email}
-                </label>
-              ))}
-            </div>
+            <AssigneePicker users={users} selectedIds={assigneeIds} onChange={setAssigneeIds} block />
           )}
         </div>
 

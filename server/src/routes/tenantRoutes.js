@@ -361,11 +361,15 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
   // different places — see tenantSecrets.js).
   if (approved.error && /does not exist|missing permissions/i.test(approved.error)) {
     const where = { env: 'הגדרות השרת (Vercel)', vault: 'הפורטל ("מזהים וחיבורים")', local: 'מערכת המשימות' };
+    // a business linked to the portal has no token field here any more — say where to fix it
     approved.error =
-      `ה-Access Token השמור לא מקבל גישה ל-WABA ${templatesWaba}. ` +
-      `הטוקן מגיע מ${where[sources.whatsapp_access_token] || '—'} וה-WABA ID מ${where[sources.whatsapp_waba_id] || '—'}. ` +
-      'צריך טוקן של ה-Meta Business שה-WABA הזה שייך לו (System User עם ההרשאות whatsapp_business_messaging ' +
-      'ו-whatsapp_business_management על ה-WABA) — מדביקים אותו בשדה Access Token ושומרים.';
+      sources.whatsapp_access_token === 'vault'
+        ? `הטוקן ששמור לעסק בפורטל לא מגיע לחשבון הוואטסאפ (WABA ${templatesWaba}). ` +
+          'מתקנים בפורטל: "מזהים וחיבורים" ← "חיבור מהיר" — מדביקים את הטוקן של העסק, "מצא מספרים", מסמנים את המספר ושומרים.'
+        : `ה-Access Token השמור לא מקבל גישה ל-WABA ${templatesWaba}. ` +
+          `הטוקן מגיע מ${where[sources.whatsapp_access_token] || '—'} וה-WABA ID מ${where[sources.whatsapp_waba_id] || '—'}. ` +
+          'צריך טוקן של ה-Meta Business שה-WABA הזה שייך לו (System User עם ההרשאות whatsapp_business_messaging ' +
+          'ו-whatsapp_business_management על ה-WABA) — מדביקים אותו בשדה Access Token ושומרים.';
   }
   res.json({
     events: TEMPLATE_EVENTS,

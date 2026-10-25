@@ -140,11 +140,9 @@ export default function WhatsAppSettingsView() {
       applySettings(s);
       setTemplatesKey((k) => k + 1);
       setAccessToken('');
-      setMessage(
-        !s.linked || s.vault?.ok
-          ? 'נשמר בהצלחה'
-          : 'נשמר כאן, אבל השמירה בפורטל נכשלה — נסו שוב או עדכנו בפורטל ב"מזהים וחיבורים"'
-      );
+      // a business linked to the portal saves only the message link here, and one that isn't keeps
+      // its WhatsApp here — nothing from this form goes to the portal any more
+      setMessage('נשמר בהצלחה');
     } catch (err) {
       setMessage(err.message?.startsWith('API error') ? 'שגיאה בשמירה' : err.message || 'שגיאה בשמירה');
       console.error(err);

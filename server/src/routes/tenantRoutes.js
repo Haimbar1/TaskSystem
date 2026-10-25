@@ -172,9 +172,17 @@ router.post('/overdue-check/run', requireAuth, requireTenant, requireTenantAdmin
 // share is listed once. A business whose numbers Meta won't list still shows, by its Phone Number ID.
 // Then the numbers only the WhatsApp system's account lists hold (whatsappSystemAccounts.js),
 // marked origin 'whatsapp' — those are moved through it, never with a token here.
+// Only this business's own numbers and עסק חכם's (Haim, 2026-10-25: "רק מהעסק שלו ומעסק חכם") —
+// choosing one of עסק חכם's makes the portal hand it over with עסק חכם's token, without touching
+// this business's own number (portal secrets/whatsappAccounts.js).
+const PLATFORM_PORTAL_TENANT = Number(process.env.PLATFORM_TENANT_ID || 3);
+const allowedSource = (t, activeId) => t.id === activeId || Number(t.portal_tenant_id) === PLATFORM_PORTAL_TENANT;
+
 router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   // SELECT * so this works where portal_tenant_id hasn't been added yet (portalProvision.js).
-  const { rows } = await pool.query('SELECT * FROM tenants ORDER BY id = $1 DESC, name', [req.tenantId]);
+  const all = (await pool.query('SELECT * FROM tenants ORDER BY id = $1 DESC, name', [req.tenantId])).rows;
+  const rows = all.filter((t) => allowedSource(t, req.tenantId));
+  const myPortalId = Number(all.find((t) => t.id === req.tenantId)?.portal_tenant_id) || null;
   const sources = [];
   const seen = new Set();
   for (const t of rows) {
@@ -202,6 +210,8 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
   }
   const nameByPortalId = new Map(rows.filter((t) => t.portal_tenant_id).map((t) => [Number(t.portal_tenant_id), t.name]));
   for (const a of await listWhatsAppSystemAccounts()) {
+    const owner = Number(a.tenant) || null;
+    if (owner !== PLATFORM_PORTAL_TENANT && (!myPortalId || owner !== myPortalId)) continue;
     if (seen.has(a.phoneNumberId)) {
       // Already listed from a business here: show it by the number and name the WhatsApp system knows.
       const listed = sources.find((s) => s.whatsapp_phone_number_id === a.phoneNumberId);
@@ -238,6 +248,10 @@ async function takeFromWhatsAppSystem(req, res, phoneNumberId) {
   }
   const account = (await listWhatsAppSystemAccounts()).find((a) => a.phoneNumberId === phoneNumberId);
   if (!account) return res.status(404).json({ error: 'המספר לא נמצא במערכת ההודעות' });
+  const owner = Number(account.tenant) || null;
+  if (owner !== portalId && owner !== PLATFORM_PORTAL_TENANT) {
+    return res.status(400).json({ error: 'אפשר לבחור רק מספר של העסק הזה או של עסק חכם' });
+  }
   const moved = await moveAccountToVault(phoneNumberId, portalId, req.user?.email);
   if (!moved.ok) {
     console.warn('[whatsapp-system] moving an account failed:', moved.error);
@@ -266,8 +280,9 @@ router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireS
   const phoneNumberId = String(req.body?.phoneNumberId || '');
   if (phoneNumberId && req.body?.origin === 'whatsapp') return takeFromWhatsAppSystem(req, res, phoneNumberId);
   if (!sourceId || !phoneNumberId) return res.status(400).json({ error: 'בחרו מספר' });
-  const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [sourceId]);
+  const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [sourceId]);
   if (!rows[0]) return res.status(404).json({ error: 'העסק לא נמצא' });
+  if (!allowedSource(rows[0], req.tenantId)) return res.status(400).json({ error: 'אפשר לבחור רק מספר של העסק הזה או של עסק חכם' });
   const { values: source } = await whatsappCredentials(sourceId);
   if (!source.whatsapp_access_token || !source.whatsapp_phone_number_id) {
     return res.status(400).json({ error: 'לעסק הזה אין וואטסאפ מחובר' });

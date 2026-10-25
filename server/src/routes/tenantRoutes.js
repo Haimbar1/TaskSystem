@@ -17,6 +17,7 @@ import {
 import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
+import { getCheckSettings, setCheckHour, runOverdueCheck } from '../services/overdueCheck.js';
 
 const router = Router();
 
@@ -139,6 +140,31 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   if (!vault.ok && vault.error !== 'not-linked') console.warn('[secrets] writing to the portal vault failed:', vault.error);
   await recordAction(req, { action: 'settings_changed', details: 'הגדרות וואטסאפ' });
   res.json(await whatsappSettingsResponse(req.tenantId, { vault }));
+});
+
+// The overdue check's hour (Israel time) and "בדוק עכשיו" — see services/overdueCheck.js.
+router.get('/overdue-check', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+  res.json(await getCheckSettings(req.tenantId));
+});
+
+router.put('/overdue-check', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  const error = await setCheckHour(req.tenantId, req.body?.hour);
+  if (error) return res.status(400).json({ error });
+  await recordAction(req, {
+    action: 'settings_changed',
+    details: `שעת בדיקת משימות באיחור: ${String(req.body.hour).padStart(2, '0')}:00`,
+  });
+  res.json(await getCheckSettings(req.tenantId));
+});
+
+router.post('/overdue-check/run', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  try {
+    const result = await runOverdueCheck(req.tenantId);
+    res.json({ ...result, ...(await getCheckSettings(req.tenantId)) });
+  } catch (err) {
+    console.error('POST /api/tenants/overdue-check/run failed:', err);
+    res.status(500).json({ error: 'הבדיקה נכשלה — נסו שוב' });
+  }
 });
 
 // Super admin: every WhatsApp number the businesses' WABAs hold (this one included), as Meta shows

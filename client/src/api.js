@@ -54,6 +54,10 @@ export const api = {
   getWhatsAppSettings: () => request('/api/tenants/whatsapp-settings'),
   updateWhatsAppSettings: (data) =>
     request('/api/tenants/whatsapp-settings', { method: 'PATCH', body: JSON.stringify(data) }),
+  getOverdueCheck: () => request('/api/tenants/overdue-check'),
+  setOverdueCheckHour: (hour) =>
+    request('/api/tenants/overdue-check', { method: 'PUT', body: JSON.stringify({ hour }) }),
+  runOverdueCheck: () => request('/api/tenants/overdue-check/run', { method: 'POST' }),
   getWhatsAppTemplates: () => request('/api/tenants/whatsapp-templates'),
   updateWhatsAppTemplates: (settings) =>
     request('/api/tenants/whatsapp-templates', { method: 'PUT', body: JSON.stringify({ settings }) }),

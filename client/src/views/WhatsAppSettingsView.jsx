@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 import WhatsAppTemplatesSettings from '../components/WhatsAppTemplatesSettings.jsx';
+import OverdueCheckSettings from '../components/OverdueCheckSettings.jsx';
 
 // Where a value the business sends with comes from (server/src/tenantSecrets.js): the server's
 // environment wins for the original business, then the portal vault, then this app's own row — so a
@@ -334,10 +335,12 @@ export default function WhatsAppSettingsView() {
             במשימה, עם פירוט מה השתנה ומי שינה (תבנית "המשימה עודכנה").
           </li>
           <li>
-            <span className="font-medium">משימה באיחור</span> — בבדיקה האוטומטית, לאחראים על כל משימה שתאריך היעד שלה עבר
-            והיא לא במצב "בוצע" או "מושהה".
+            <span className="font-medium">משימה באיחור</span> — בבדיקה האוטומטית, פעם ביום בשעה שנבחרה למטה: לאחראים על כל
+            משימה שתאריך היעד שלה עבר (מהבוקר שאחרי תאריך היעד) והיא לא בסטטוס סיום או "מושהה". כל יום עד שהמשימה
+            מסתיימת; לא למי שפתח את המשימה.
           </li>
         </ul>
+        <OverdueCheckSettings />
         <p className="text-gray-500">
           מי שביצע את השינוי לא מקבל הודעה על עצמו, והודעות נשלחות רק לאנשי העסק עצמו (לא למנהל המערכת כשהוא עובד
           בתוך העסק) ורק למשתמשים שיש להם מספר טלפון. אחרי שמירת משימה

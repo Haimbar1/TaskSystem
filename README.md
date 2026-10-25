@@ -19,4 +19,4 @@
 - סינון עמודות בטבלה (המיון כבר עובד, הסינון עדיין TODO)
 - קנבן לפי אחראי — עדיין placeholder, צריך להרחיב את `/api/tasks` כך שיחזיר גם assignees
 - מיפוי משתני התבנית האמיתיים של WhatsApp (components/parameters) לכל סוג אירוע ב-`whatsapp.js`
-- Deploy ל-Vercel. בדיקת האיחורים (`/api/cron/check-overdue`) רצה מ-Vercel Cron (`vercel.json`) כל יום ב-06:00 UTC — צריך `CRON_SECRET` במשתני הסביבה של Vercel
+- Deploy ל-Vercel. בדיקת האיחורים (`/api/cron/check-overdue`) רצה מ-Vercel Cron (`vercel.json`) כל שעה; כל עסק נבדק פעם ביום בשעה שבחר בהגדרות הוואטסאפ (ברירת מחדל 08:00) — צריך `CRON_SECRET` במשתני הסביבה של Vercel

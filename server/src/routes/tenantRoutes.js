@@ -81,7 +81,7 @@ router.post('/', requireAuth, requireSuperAdmin, async (req, res) => {
 // values and writes what's saved here into the vault too (and onto the tenants row, for a
 // business not linked to the portal). Access token is never sent back to the client in full.
 async function whatsappSettingsResponse(tenantId, extra = {}) {
-  const { values, sources, linked } = await whatsappCredentials(tenantId);
+  const { values, sources, linked, label } = await whatsappCredentials(tenantId);
   // The WABA's numbers as Meta has them, to flag a Phone Number ID that isn't one of them (it then
   // sends from a number other than the WABA's, or fails). [] when Meta can't list them: no warning.
   const wabaNumbers =
@@ -105,12 +105,35 @@ async function whatsappSettingsResponse(tenantId, extra = {}) {
     whatsapp_access_token_set: !!values.whatsapp_access_token,
     whatsapp_phone_number_id: values.whatsapp_phone_number_id || '',
     whatsapp_waba_id: values.whatsapp_waba_id || '',
+    // the number as people know it, and the name it was given in the portal
+    display_phone_number:
+      label?.displayPhone ||
+      wabaNumbers.find((n) => n.id === values.whatsapp_phone_number_id)?.display_phone_number ||
+      '',
+    number_name: label?.name || '',
     message_link_url: await getMessageLinkSetting(tenantId),
     default_message_link: defaultMessageLink(),
     sources,
     linked,
+    portal_secrets_url: linked ? await portalSecretsUrl(tenantId) : '',
     ...extra,
   };
+}
+
+const PORTAL_URL = process.env.PORTAL_URL || 'https://portal.smartesek.com';
+async function portalSecretsUrl(tenantId) {
+  const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
+  const portalId = rows[0]?.portal_tenant_id;
+  return portalId ? `${PORTAL_URL}/tenants/${portalId}/secrets` : PORTAL_URL;
+}
+
+// A business linked to the portal gets its WhatsApp (token / number / WABA) from the portal only
+// (Haim, 2026-10-25): the form here saved whatever its fields held — the browser even filled the
+// token field with an old saved one — every time just the message link was saved, and kept putting
+// an old number and token back over the portal's.
+async function isPortalLinked(tenantId) {
+  const { rows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
+  return !!rows[0]?.portal_tenant_id;
 }
 
 router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
@@ -123,6 +146,10 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
   if (message_link_url !== undefined) {
     const linkError = await setMessageLinkSetting(req.tenantId, message_link_url);
     if (linkError) return res.status(400).json({ error: linkError });
+  }
+  if (await isPortalLinked(req.tenantId)) {
+    await recordAction(req, { action: 'settings_changed', details: 'קישור למשימה בהודעות' });
+    return res.json(await whatsappSettingsResponse(req.tenantId));
   }
   await pool.query(
     `UPDATE tenants SET
@@ -186,7 +213,7 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
   const sources = [];
   const seen = new Set();
   for (const t of rows) {
-    const { values } = await whatsappCredentials(t.id);
+    const { values, label } = await whatsappCredentials(t.id);
     if (!values.whatsapp_access_token || !values.whatsapp_phone_number_id) continue;
     const numbers = await listPhoneNumbers({
       accessToken: values.whatsapp_access_token,
@@ -205,13 +232,17 @@ router.get('/whatsapp-sources', requireAuth, requireTenant, requireSuperAdmin, a
         whatsapp_phone_number_id: n.id,
         display_phone_number: n.display_phone_number || '',
         verified_name: n.verified_name || '',
+        // the name given to the number in the portal
+        account_name: n.id === values.whatsapp_phone_number_id ? label?.name || '' : '',
       });
     }
   }
   const nameByPortalId = new Map(rows.filter((t) => t.portal_tenant_id).map((t) => [Number(t.portal_tenant_id), t.name]));
   for (const a of await listWhatsAppSystemAccounts()) {
+    // only this business's own: a move from here replaces the business's own number and token,
+    // while עסק חכם's numbers come through the portal (listed above from its row)
     const owner = Number(a.tenant) || null;
-    if (owner !== PLATFORM_PORTAL_TENANT && (!myPortalId || owner !== myPortalId)) continue;
+    if (!myPortalId || owner !== myPortalId) continue;
     if (seen.has(a.phoneNumberId)) {
       // Already listed from a business here: show it by the number and name the WhatsApp system knows.
       const listed = sources.find((s) => s.whatsapp_phone_number_id === a.phoneNumberId);
@@ -248,9 +279,8 @@ async function takeFromWhatsAppSystem(req, res, phoneNumberId) {
   }
   const account = (await listWhatsAppSystemAccounts()).find((a) => a.phoneNumberId === phoneNumberId);
   if (!account) return res.status(404).json({ error: 'המספר לא נמצא במערכת ההודעות' });
-  const owner = Number(account.tenant) || null;
-  if (owner !== portalId && owner !== PLATFORM_PORTAL_TENANT) {
-    return res.status(400).json({ error: 'אפשר לבחור רק מספר של העסק הזה או של עסק חכם' });
+  if ((Number(account.tenant) || null) !== portalId) {
+    return res.status(400).json({ error: 'מכאן אפשר לבחור רק מספר של העסק הזה. את המספר של עסק חכם בוחרים ברשימה (או בפורטל)' });
   }
   const moved = await moveAccountToVault(phoneNumberId, portalId, req.user?.email);
   if (!moved.ok) {
@@ -276,7 +306,8 @@ async function takeFromWhatsAppSystem(req, res, phoneNumberId) {
 // (tenants row + portal vault). The other business keeps its own copy — the vault is never cleared
 // from here.
 router.post('/whatsapp-settings/take-from', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
-  const sourceId = Number(req.body?.sourceTenantId);
+  // tenants ids are UUIDs — Number() made every move fail with "בחרו מספר"
+  const sourceId = String(req.body?.sourceTenantId || '');
   const phoneNumberId = String(req.body?.phoneNumberId || '');
   if (phoneNumberId && req.body?.origin === 'whatsapp') return takeFromWhatsAppSystem(req, res, phoneNumberId);
   if (!sourceId || !phoneNumberId) return res.status(400).json({ error: 'בחרו מספר' });

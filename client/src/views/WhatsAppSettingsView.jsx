@@ -27,6 +27,9 @@ export default function WhatsAppSettingsView() {
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [linked, setLinked] = useState(false);
+  const [portalUrl, setPortalUrl] = useState('');
+  const [displayPhone, setDisplayPhone] = useState('');
+  const [numberName, setNumberName] = useState('');
   const [forwardUrl, setForwardUrl] = useState('');
   const [messageLink, setMessageLink] = useState('');
   const [defaultLink, setDefaultLink] = useState('');
@@ -55,6 +58,10 @@ export default function WhatsAppSettingsView() {
     setPhoneNumberId(s.whatsapp_phone_number_id);
     setWabaId(s.whatsapp_waba_id);
     setMessageLink(s.message_link_url || '');
+    setLinked(!!s.linked);
+    setPortalUrl(s.portal_secrets_url || '');
+    setDisplayPhone(s.display_phone_number || '');
+    setNumberName(s.number_name || '');
   }
 
   // A number as people know it: "+972 50-123-4567 · Verified name", or its Phone Number ID when Meta
@@ -72,7 +79,7 @@ export default function WhatsAppSettingsView() {
       `לעבור לשלוח מהמספר ${numberLabel(source)}?\n` +
         `(WABA ${source.whatsapp_waba_id || 'ללא מזהה'}` +
         `${source.account_name ? ` · ${source.account_name}` : ''}${source.tenant_name ? ` של "${source.tenant_name}"` : ''})\n` +
-        'הטוקן, ה-WABA ID וה-Phone Number ID שלו יחליפו את הנוכחיים בעסק הזה.'
+        'מערכת המשימות תשלח מהמספר הזה.'
     );
     if (!ok) return;
     setTaking(true);
@@ -172,8 +179,8 @@ export default function WhatsAppSettingsView() {
         <div className="mb-4 border rounded-lg p-3 bg-gray-50 space-y-2">
           <h3 className="font-semibold text-sm">החלפת מספר וואטסאפ (WABA)</h3>
           <p className="text-xs text-gray-500">
-            כל המספרים בחשבונות ה-WABA של העסקים שלך. בחרו מספר — ה-WABA והטוקן שלו עוברים איתו לעסק הזה, והעסק
-            שממנו הוא הגיע ממשיך לשלוח ממנו.
+            המספרים של העסק הזה ושל עסק חכם. בחרו מספר ולחצו "העבר לכאן" — מערכת המשימות תשלח ממנו. מספר של עסק חכם
+            נשלח עם הטוקן של עסק חכם, והוואטסאפ של העסק הזה עצמו לא משתנה.
           </p>
           <div className="flex gap-2">
             <select
@@ -204,8 +211,31 @@ export default function WhatsAppSettingsView() {
           {takeMessage && <p className="text-sm text-gray-600">{takeMessage}</p>}
         </div>
       )}
+      {canEdit && linked && (
+        <div className="mb-3 border rounded-lg p-3 bg-blue-50 text-sm space-y-1">
+          <p className="text-xs text-blue-900">מערכת המשימות שולחת מהמספר:</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {displayPhone ? <bdi dir="ltr">{displayPhone}</bdi> : phoneNumberId ? 'מספר לא מזוהה' : 'לא מוגדר מספר'}
+            {numberName && <span className="font-normal text-gray-700"> · {numberName}</span>}
+          </p>
+          <p className="text-xs text-gray-400">
+            Phone Number ID <span dir="ltr">{phoneNumberId || '—'}</span> · WABA <span dir="ltr">{wabaId || '—'}</span> ·
+            טוקן {tokenSet ? 'מוגדר' : 'לא מוגדר'}
+          </p>
+          <p className="text-gray-600">
+            הטוקן, והבחירה אם מערכת המשימות שולחת מהמספר של העסק או של עסק חכם — בפורטל, ב"מזהים וחיבורים" ← "חיבור
+            מהיר".
+          </p>
+          {portalUrl && (
+            <a href={portalUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+              שינוי בפורטל
+            </a>
+          )}
+        </div>
+      )}
       {canEdit && (
       <form onSubmit={handleSubmit} className="space-y-3">
+        {!linked && (<>
         <div>
           <label className="block text-sm mb-1">
             Access Token {tokenSet && <span className="text-green-600">(מוגדר)</span>}
@@ -213,6 +243,7 @@ export default function WhatsAppSettingsView() {
           </label>
           <input
             type="password"
+            autoComplete="new-password"
             placeholder={tokenSet ? '••••••••  (השאירי ריק כדי לא לשנות)' : ''}
             className="border rounded p-2 w-full"
             value={accessToken}
@@ -265,6 +296,7 @@ export default function WhatsAppSettingsView() {
             </div>
           )}
         </div>
+        </>)}
         <div>
           <label className="block text-sm mb-1">קישור למשימה בהודעות</label>
           <input

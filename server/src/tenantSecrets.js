@@ -83,7 +83,14 @@ export async function whatsappCredentials(tenantId) {
       sources[f.column] = row[f.column] ? 'local' : '';
     }
   }
-  return { values, sources, linked: !!portalId };
+  // How people know the number, from the portal (its phone and the name given there) — only when
+  // the number itself came from the portal.
+  const fromVault = sources.whatsapp_phone_number_id === 'vault';
+  const label = {
+    displayPhone: fromVault ? vault.META_WA_DISPLAY_PHONE || '' : '',
+    name: fromVault ? vault.META_WA_NUMBER_NAME || '' : '',
+  };
+  return { values, sources, linked: !!portalId, label };
 }
 
 // Writes what the settings screen saved into the vault too, so the WhatsApp system / BotApp use the

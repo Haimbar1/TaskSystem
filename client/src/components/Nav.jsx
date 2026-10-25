@@ -25,7 +25,7 @@ export default function Nav() {
   // would strand the iframe on a login page Google won't render there.
   const showLogout = !user?.is_embed || !inIframe();
   const linkClass = ({ isActive }) =>
-    `px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `shrink-0 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive ? 'bg-white text-teal-900' : 'text-teal-50/80 hover:bg-white/10 hover:text-white'
     }`;
 
@@ -37,8 +37,10 @@ export default function Nav() {
   return (
     <>
       <nav className="bg-gradient-to-l from-teal-950 to-teal-900 text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        {/* On a phone the view links go to a row of their own below (scrolling sideways by
+            themselves), so the bar is never wider than the screen and the page can't slide. */}
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Embedded (shared business login): no portal identity to switch modules with. Its
                 gear has only what applies there (SettingsMenu), and no log out inside the iframe. */}
             {!user?.is_embed && <AppSwitcher />}
@@ -57,7 +59,7 @@ export default function Nav() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="order-last w-full lg:order-none lg:w-auto flex items-center gap-1 overflow-x-auto">
             <NavLink to="/" end className={linkClass}>
               טבלה
             </NavLink>
@@ -80,7 +82,7 @@ export default function Nav() {
             {user?.is_embed && <ActingUserPicker />}
             <button
               onClick={() => setShowTaskForm(true)}
-              className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors"
+              className="whitespace-nowrap px-2.5 sm:px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium transition-colors"
             >
               + משימה חדשה
             </button>
@@ -91,7 +93,7 @@ export default function Nav() {
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-2 rounded-lg border border-white/20 text-sm text-teal-50 hover:bg-white/10 transition-colors"
+                  className="whitespace-nowrap px-2.5 sm:px-3 py-2 rounded-lg border border-white/20 text-sm text-teal-50 hover:bg-white/10 transition-colors"
                 >
                   התנתקות
                 </button>

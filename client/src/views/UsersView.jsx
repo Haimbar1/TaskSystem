@@ -114,6 +114,7 @@ export default function UsersView() {
         </p>
       </div>
 
+      <div className="overflow-x-auto">
       <table className="w-full bg-white border rounded-xl shadow-sm overflow-hidden">
         <thead>
           <tr>
@@ -151,6 +152,7 @@ export default function UsersView() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {editingUser && (
         <UserEditModal

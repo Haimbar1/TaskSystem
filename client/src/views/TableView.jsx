@@ -66,7 +66,9 @@ export default function TableView() {
   return (
     <>
       <PageFrame title="כל המשימות" subtitle={`${tasks.length} משימות`} actions={<TaskFilters />}>
-      <table className="w-full">
+      {/* Wider than a phone: the table scrolls sideways inside its frame, not the whole page. */}
+      <div className="overflow-x-auto">
+      <table className="w-full whitespace-nowrap">
         <thead>
           <tr>
             {columns.map(([key, label]) => (
@@ -105,6 +107,7 @@ export default function TableView() {
           ))}
         </tbody>
       </table>
+      </div>
       </PageFrame>
 
       {editingTask && (

@@ -6,10 +6,10 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
 
 // The overdue check's hour and "בדוק עכשיו" (server/src/services/overdueCheck.js). Business admins
-// change them; others (the shared Monday login) see the hour only.
+// (and the shared Monday login, standing in for them) change them; others see the hour only.
 export default function OverdueCheckSettings() {
   const { user } = useAppContext();
-  const canEdit = user?.role === 'admin' || !!user?.is_super_admin;
+  const canEdit = user?.role === 'admin' || !!user?.is_super_admin || !!user?.is_embed;
   const [settings, setSettings] = useState(null);
   const [message, setMessage] = useState('');
   const [running, setRunning] = useState(false);

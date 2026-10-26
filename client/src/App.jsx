@@ -48,7 +48,8 @@ export default function App() {
   if (loading) return null;
   if (!user) return <Login />;
 
-  const canManageUsers = user.role === 'admin' || user.is_super_admin;
+  // Inside Monday the shared embed login stands in for the business admin (server tenantRoutes.js)
+  const canManageUsers = user.role === 'admin' || user.is_super_admin || user.is_embed;
 
   return (
     <AppProvider user={user}>
@@ -67,19 +68,19 @@ export default function App() {
             />
             <Route
               path="/whatsapp-settings"
-              element={canManageUsers || user.is_embed ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
+              element={canManageUsers ? <WhatsAppSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/whatsapp-log"
-              element={canManageUsers || user.is_embed ? <WhatsAppLogView /> : <Navigate to="/" replace />}
+              element={canManageUsers ? <WhatsAppLogView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/status-settings"
-              element={canManageUsers || user.is_embed ? <StatusSettingsView /> : <Navigate to="/" replace />}
+              element={canManageUsers ? <StatusSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/audit-log"
-              element={canManageUsers || user.is_embed ? <AuditLogView /> : <Navigate to="/" replace />}
+              element={canManageUsers ? <AuditLogView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/embed-settings"

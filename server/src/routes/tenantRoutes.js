@@ -26,18 +26,14 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
+// The business's admins — and inside Monday the embed login (one shared user per business, see
+// embed.js), which stands in for the business admin there: it sets up everything a business admin
+// can (Haim, 2026-10-26); only the platform owner's things (requireSuperAdmin) stay out of reach.
 function requireTenantAdmin(req, res, next) {
-  if (req.user.role !== 'admin' && !req.user.is_super_admin) {
+  if (req.user.role !== 'admin' && !req.user.is_super_admin && !isEmbedUser(req.user)) {
     return res.status(403).json({ error: 'Admins only' });
   }
   next();
-}
-
-// Read-only screens (and the task statuses) also open inside Monday: the embed login (one shared user per business, see
-// embed.js) gets the gear menu there, standing in for the business admin.
-function requireTenantAdminOrEmbed(req, res, next) {
-  if (isEmbedUser(req.user)) return next();
-  requireTenantAdmin(req, res, next);
 }
 
 // Creates a brand-new business plus its first admin user, who can then sign
@@ -136,7 +132,7 @@ async function isPortalLinked(tenantId) {
   return !!rows[0]?.portal_tenant_id;
 }
 
-router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+router.get('/whatsapp-settings', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   res.json(await whatsappSettingsResponse(req.tenantId, { status_forward_url: statusForwardUrl(req) }));
 });
 
@@ -170,7 +166,7 @@ router.patch('/whatsapp-settings', requireAuth, requireTenant, requireSuperAdmin
 });
 
 // The overdue check's hour (Israel time) and "בדוק עכשיו" — see services/overdueCheck.js.
-router.get('/overdue-check', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+router.get('/overdue-check', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   res.json(await getCheckSettings(req.tenantId));
 });
 
@@ -405,7 +401,7 @@ router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {
   res.json({ statuses: await getStatuses(req.tenantId), colors: STATUS_COLORS });
 });
 
-router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   const result = await setStatuses(req.tenantId, req.body?.statuses);
   if (result.error) return res.status(400).json({ error: result.error });
   await recordAction(req, {
@@ -416,12 +412,12 @@ router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdminOrEmb
 });
 
 // The active business's action log, newest first (see services/auditLog.js).
-router.get('/audit-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+router.get('/audit-log', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   res.json(await listActions(req.tenantId));
 });
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
-router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
+router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
   res.json(await listMessages(req.tenantId, { search: String(req.query.q || '') }));
 });
 

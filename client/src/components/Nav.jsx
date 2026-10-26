@@ -19,7 +19,8 @@ export default function Nav() {
   const { user, bumpRefresh } = useAppContext();
   const [showTaskForm, setShowTaskForm] = useState(false);
 
-  const canManageUsers = user?.role === 'admin' || user?.is_super_admin;
+  // Inside Monday the shared embed login stands in for the business admin (server tenantRoutes.js)
+  const canManageUsers = user?.role === 'admin' || user?.is_super_admin || user?.is_embed;
   // The embed login is shared by the whole browser, so opening the embed link replaces a real
   // login in other tabs too. Outside the iframe it can be logged out of; inside it, logging out
   // would strand the iframe on a login page Google won't render there.

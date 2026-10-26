@@ -49,11 +49,12 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
   };
   const itemClass = 'w-full text-right px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-sm';
   const sectionClass = 'px-2.5 pt-2 pb-0.5 text-[10px] font-bold text-gray-400';
-  // Inside Monday (shared embed login): no portal, but the task statuses, the WhatsApp screens
-  // (read-only) and the business's people, who are managed here since they never log in through the portal.
+  // Inside Monday (shared embed login, counted in canManageUsers as the business admin): everything
+  // but the portal and switching businesses — and the business's people, who are managed here
+  // since they never log in through the portal.
   const isEmbed = !!user?.is_embed;
-  const hasAppItems = canManageUsers || user?.is_super_admin || isEmbed;
-  const showWhatsApp = canManageUsers || isEmbed;
+  const hasAppItems = canManageUsers || user?.is_super_admin;
+  const showWhatsApp = canManageUsers;
 
   return (
     <div ref={ref} className="relative">
@@ -81,12 +82,12 @@ export default function SettingsMenu({ user, canManageUsers, onLogout }) {
 
           {/* Users and new businesses are managed in the portal (link above), not here. */}
           {hasAppItems && <div className={sectionClass}>הגדרות האפליקציה</div>}
-          {(canManageUsers || isEmbed) && (
+          {canManageUsers && (
             <button onClick={() => go('/status-settings')} className={itemClass}>
               סטטוסים של משימות
             </button>
           )}
-          {(canManageUsers || isEmbed) && (
+          {canManageUsers && (
             <button onClick={() => go('/audit-log')} className={itemClass}>
               יומן פעולות
             </button>

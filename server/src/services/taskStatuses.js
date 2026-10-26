@@ -17,7 +17,7 @@ export const DEFAULT_STATUSES = [
 ];
 
 // Must match STATUS_COLOR_OPTIONS in client/src/constants.js.
-export const STATUS_COLORS = ['sky', 'amber', 'teal', 'emerald', 'gray', 'red', 'violet', 'pink', 'orange', 'blue'];
+export const STATUS_COLORS = ['sky', 'amber', 'teal', 'emerald', 'gray', 'red', 'violet', 'pink', 'orange', 'blue', 'white'];
 
 // Same as migrations/007_task_statuses.sql (keep in sync), so a serverless deploy gets it on first use.
 // tasks.status was a fixed enum; a business's own statuses need free text.

@@ -13,6 +13,8 @@ export const STATUS_COLOR_OPTIONS = {
   pink: { label: 'ורוד', bar: 'bg-pink-500', badge: 'bg-pink-50 text-pink-700', row: 'bg-pink-200', ring: 'border-pink-500 text-pink-700' },
   orange: { label: 'כתום', bar: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700', row: 'bg-orange-200', ring: 'border-orange-500 text-orange-700' },
   blue: { label: 'כחול', bar: 'bg-blue-500', badge: 'bg-blue-50 text-blue-700', row: 'bg-blue-200', ring: 'border-blue-500 text-blue-700' },
+  // No color, for whoever doesn't want colored rows; its bar and circle stay a neutral gray so they still show
+  white: { label: 'לבן (בלי צבע)', bar: 'bg-gray-400', badge: 'bg-white text-gray-600', row: 'bg-white', ring: 'border-gray-400 text-gray-600' },
 };
 // An overdue task's table row / card (utils.js isOverdue)
 export const OVERDUE_ROW = 'bg-red-300';

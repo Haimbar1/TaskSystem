@@ -75,7 +75,7 @@ export default function App() {
             />
             <Route
               path="/status-settings"
-              element={canManageUsers ? <StatusSettingsView /> : <Navigate to="/" replace />}
+              element={canManageUsers || user.is_embed ? <StatusSettingsView /> : <Navigate to="/" replace />}
             />
             <Route
               path="/audit-log"

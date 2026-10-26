@@ -33,7 +33,7 @@ function requireTenantAdmin(req, res, next) {
   next();
 }
 
-// Read-only screens also open inside Monday: the embed login (one shared user per business, see
+// Read-only screens (and the task statuses) also open inside Monday: the embed login (one shared user per business, see
 // embed.js) gets the gear menu there, standing in for the business admin.
 function requireTenantAdminOrEmbed(req, res, next) {
   if (isEmbedUser(req.user)) return next();
@@ -399,12 +399,13 @@ router.put('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
 });
 
 // The active business's task statuses (services/taskStatuses.js). Everyone needs them for the
-// board; only the business's admins change them.
+// board; the business's admins change them — and inside Monday the embed login, standing in for
+// the admin there (Haim, 2026-10-26).
 router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {
   res.json({ statuses: await getStatuses(req.tenantId), colors: STATUS_COLORS });
 });
 
-router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
   const result = await setStatuses(req.tenantId, req.body?.statuses);
   if (result.error) return res.status(400).json({ error: result.error });
   await recordAction(req, {

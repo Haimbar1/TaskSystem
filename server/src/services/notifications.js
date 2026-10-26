@@ -10,8 +10,10 @@ async function formatFieldValue(tenantId, field, value) {
   return String(value);
 }
 
-// Description lines ticked in the edit form start with this (client/src/descriptionLines.js).
+// Description lines ticked in the edit form start with DONE_MARK, items not ticked yet with
+// OPEN_MARK (client/src/descriptionLines.js).
 const DONE_MARK = '✅ ';
+const OPEN_MARK = '☐ ';
 const doneLines = (text) =>
   String(text || '')
     .split('\n')
@@ -23,12 +25,13 @@ async function describeChange(tenantId, field, oldValue, newValue) {
   if (field === 'assignees') return 'האחראים על המשימה עודכנו';
   if (field === 'description') {
     // only lines ticked or unticked: say which, rather than repeating the whole text
-    const strip = (t) => String(t || '').split('\n').map((l) => (l.startsWith(DONE_MARK) ? l.slice(DONE_MARK.length) : l)).join('\n');
+    const strip = (t) => String(t || '').split('\n').map((l) => (l.startsWith(DONE_MARK) ? l.slice(DONE_MARK.length) : l.startsWith(OPEN_MARK) ? l.slice(OPEN_MARK.length) : l)).join('\n');
     if (strip(oldValue) === strip(newValue)) {
       const before = doneLines(oldValue);
       const ticked = doneLines(newValue).filter((l) => !before.includes(l));
       if (ticked.length) return `סומן כבוצע בתיאור: ${ticked.map((l) => `"${l}"`).join(', ')}`;
-      return 'הוסר סימון "בוצע" משורה בתיאור';
+      if (before.some((l) => !doneLines(newValue).includes(l))) return 'הוסר סימון "בוצע" משורה בתיאור';
+      return 'שורות בתיאור סומנו כפריטים לביצוע';
     }
   }
   const label = FIELD_LABELS[field] || field;

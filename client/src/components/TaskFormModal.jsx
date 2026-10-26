@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { PRIORITY_LABELS } from '../constants.js';
@@ -6,7 +6,7 @@ import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
 import TaskNotes from './TaskNotes.jsx';
 import AssigneePicker from './AssigneePicker.jsx';
-import { isDoneLine, lineText, toggleLine } from '../descriptionLines.js';
+import { isDoneLine, isItemLine, isLegacyList, hasItems, lineText, toggleLine, toggleItems, typedMarks } from '../descriptionLines.js';
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
@@ -19,8 +19,24 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   const [usersError, setUsersError] = useState('');
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
-  // An existing task opens its description as lines to tick; a new one as text to type.
-  const [editingText, setEditingText] = useState(!isEdit);
+  // A description with item lines opens as lines to tick, anything else as text to type.
+  const hasListLines = (d) => hasItems(d) || isLegacyList(d);
+  const [editingText, setEditingText] = useState(() => !isEdit || !hasListLines(task?.description || ''));
+  const showText = editingText || !hasListLines(description);
+  const legacy = isLegacyList(description);
+  const textRef = useRef(null);
+  // a click on the text opens it for editing, with the cursor in it
+  const [focusText, setFocusText] = useState(false);
+  function editText() {
+    setEditingText(true);
+    setFocusText(true);
+  }
+  function markLines() {
+    const el = textRef.current;
+    const from = el ? el.selectionStart : description.length;
+    const to = el ? el.selectionEnd : description.length;
+    setDescription((d) => toggleItems(d, from, to));
+  }
   const [priority, setPriority] = useState(task?.priority || 'normal');
   const [dueDate, setDueDate] = useState(toDateInputValue(task?.due_date));
   const [assigneeIds, setAssigneeIds] = useState((task?.assignees || []).map((a) => a.id));
@@ -56,30 +72,36 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
       setError('חובה לבחור מי יוצר את המשימה');
       return;
     }
-    setSaving(true);
-    setError('');
-    try {
-      const payload = {
-        title,
-        description,
-        priority,
-        due_date: dueDate || null,
-        assignee_ids: assigneeIds,
-      };
-      if (needsCreator) {
-        payload.created_by = createdBy;
-        // Whoever creates a task here is who's using this device (the "who am I" in Nav).
-        if (createdBy !== getActingUserId()) setActingUserId(createdBy);
-      }
-      const saved = isEdit ? await api.updateTask(task.id, payload) : await api.createTask(payload);
-      (onSaved || onCreated)?.(saved);
-      onClose();
-    } catch (err) {
-      setError(isEdit ? 'שגיאה בעדכון המשימה' : 'שגיאה ביצירת המשימה');
-      console.error(err);
-    } finally {
-      setSaving(false);
+    const payload = {
+      title,
+      description,
+      priority,
+      due_date: dueDate || null,
+      assignee_ids: assigneeIds,
+    };
+    if (needsCreator) {
+      payload.created_by = createdBy;
+      // Whoever creates a task here is who's using this device (the "who am I" in Nav).
+      if (createdBy !== getActingUserId()) setActingUserId(createdBy);
     }
+    // The window closes at once and the save goes on in the background (Haim, 2026-10-26: saving
+    // waited for the WhatsApp messages / the check whether any are due). An edited task shows its
+    // changes right away; the server's copy replaces it when it answers, and the WhatsApp notice
+    // (WhatsAppSentToast) or a failure notice shows then.
+    if (isEdit) {
+      onSaved?.({ ...task, ...payload, assignees: users.length ? users.filter((u) => assigneeIds.includes(u.id)) : task.assignees });
+    }
+    onClose();
+    const name = title.trim();
+    (isEdit ? api.updateTask(task.id, payload) : api.createTask(payload))
+      .then((saved) => (onSaved || onCreated)?.(saved))
+      .catch((err) => {
+        console.error(err);
+        if (isEdit) onSaved?.(task); // back to what's really saved
+        window.dispatchEvent(new CustomEvent('task-save-failed', {
+          detail: `${isEdit ? 'השמירה של' : 'יצירת'} המשימה "${name}" נכשלה${isEdit ? ' — השינויים לא נשמרו' : ''}: ${err.message}`,
+        }));
+      });
   }
 
   function handleCancel() {
@@ -158,45 +180,77 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between gap-2 mb-1">
             <label className="block text-sm">תיאור</label>
-            {description.trim() && (
+            {showText && (
               <button
                 type="button"
-                onClick={() => setEditingText((v) => !v)}
-                className="text-xs text-emerald-700 hover:underline"
+                // keeps the cursor in the text, so it marks the line the cursor is on
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={markLines}
+                className="text-xs px-2 py-0.5 rounded border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                title='השורה שהסמן עליה (או השורות שסימנת) מקבלת תיבת סימון; לחיצה נוספת מחזירה לטקסט רגיל. אפשר גם להקליד [] בתחילת שורה'
               >
-                {editingText ? '☑ סימון שורות כבוצע' : '✏️ עריכת הטקסט'}
+                ☐ תיבת סימון בשורה
               </button>
             )}
           </div>
-          {editingText || !description.trim() ? (
-            <textarea
-              className="w-full border rounded p-2 resize-y"
-              rows={6}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+          {showText ? (
+            <>
+              <textarea
+                ref={textRef}
+                className="w-full border rounded p-2 resize-y"
+                rows={6}
+                value={description}
+                autoFocus={focusText}
+                onChange={(e) => {
+                  const el = e.target;
+                  const next = typedMarks(el.value);
+                  setDescription(next);
+                  // "[]" just became "☐ ": the cursor stays where it was, not at the end of the text
+                  if (next !== el.value) {
+                    const at = el.selectionStart + next.length - el.value.length;
+                    requestAnimationFrame(() => el.setSelectionRange(at, at));
+                  }
+                }}
+                // back to the tick boxes once the text has items
+                onBlur={() => hasListLines(description) && setEditingText(false)}
+              />
+              <p className="text-xs text-gray-400 mt-0.5">
+                שורה שמתחילה ב-[] (או "☐ תיבת סימון בשורה") היא פריט לסימון "בוצע"; שאר השורות הן טקסט רגיל.
+              </p>
+            </>
           ) : (
-            // Each line gets a tick box; ticking marks it done (descriptionLines.js), saved with "שמור".
+            // Only item lines get a tick box (descriptionLines.js), saved with "שמור"; a click on the
+            // text edits it — no separate edit button (Haim, 2026-10-26)
             <div className="border rounded p-2 space-y-1 max-h-80 overflow-y-auto">
               {description.split('\n').map((line, i) =>
-                line.trim() ? (
-                  <label key={i} className="flex items-start gap-2 text-sm cursor-pointer">
+                !line.trim() ? (
+                  <div key={i} className="h-2" onClick={editText} />
+                ) : isItemLine(line, legacy) ? (
+                  <div key={i} className="flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      className="mt-1"
+                      className="mt-1 cursor-pointer"
                       checked={isDoneLine(line)}
                       onChange={() => setDescription((d) => toggleLine(d, i))}
                     />
-                    <span className={`whitespace-pre-wrap ${isDoneLine(line) ? 'line-through text-gray-400' : ''}`}>
+                    <span
+                      onClick={editText}
+                      className={`flex-1 whitespace-pre-wrap cursor-text ${isDoneLine(line) ? 'line-through text-gray-400' : ''}`}
+                    >
                       {lineText(line)}
                     </span>
-                  </label>
+                  </div>
                 ) : (
-                  <div key={i} className="h-2" />
+                  <p key={i} onClick={editText} className="text-sm whitespace-pre-wrap cursor-text">
+                    {line}
+                  </p>
                 )
               )}
+              <button type="button" onClick={editText} className="text-xs text-gray-400 hover:text-emerald-700">
+                לחצו על הטקסט כדי לערוך אותו
+              </button>
             </div>
           )}
         </div>

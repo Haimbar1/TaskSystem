@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react';
 // Accepted is not delivered — Meta reports delivery later, only through a webhook. Fed by api.js's 'whatsapp-sent' event; disappears on its own.
 export default function WhatsAppSentToast() {
   const [messages, setMessages] = useState(null);
+  // A task saved in the background (TaskFormModal) that failed — stays until closed
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    const onFailed = (e) => setSaveError(e.detail);
+    window.addEventListener('task-save-failed', onFailed);
+    return () => window.removeEventListener('task-save-failed', onFailed);
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -18,6 +26,17 @@ export default function WhatsAppSentToast() {
       clearTimeout(timer);
     };
   }, []);
+
+  if (saveError) {
+    return (
+      <div dir="rtl" role="alert" className="fixed top-16 right-4 z-50 max-w-sm bg-red-50 border border-red-300 rounded-lg shadow-lg p-3 text-sm space-y-1">
+        <div className="text-red-700 font-medium">{saveError}</div>
+        <button onClick={() => setSaveError('')} className="text-gray-500 text-xs">
+          סגור
+        </button>
+      </div>
+    );
+  }
 
   if (!messages?.length) return null;
 

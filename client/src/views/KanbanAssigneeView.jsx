@@ -6,6 +6,7 @@ import PageFrame from '../components/PageFrame.jsx';
 import TaskFilters from '../components/TaskFilters.jsx';
 import { filterParams } from '../taskFilters.js';
 import TaskFormModal from '../components/TaskFormModal.jsx';
+import KanbanSendUpdate, { sendKanbanUpdate, useKanbanSendUpdate } from '../components/KanbanSendUpdate.jsx';
 
 const UNASSIGNED = '__unassigned__';
 
@@ -15,6 +16,7 @@ export default function KanbanAssigneeView() {
   const [users, setUsers] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
+  const [sendUpdate, setSendUpdate] = useKanbanSendUpdate();
 
   useEffect(() => {
     api.getTasks(filterParams(filters)).then(setTasks).catch(console.error);
@@ -24,8 +26,8 @@ export default function KanbanAssigneeView() {
     api.getUsers().then(setUsers).catch(console.error);
   }, [refreshKey]);
 
-  // The card moves at once (the save also sends WhatsApp, which takes a moment) and shows that
-  // it's saving; if the save fails it goes back to where it was.
+  // The card moves at once and shows that it's saving; if the save fails it goes back to where it
+  // was. With "שלח וואטסאפ על כל שינוי" ticked, the WhatsApp update follows the save.
   async function moveTask(taskId, userId) {
     const before = tasks.find((t) => String(t.id) === String(taskId));
     if (!before) return;
@@ -37,6 +39,7 @@ export default function KanbanAssigneeView() {
     try {
       const updated = await api.updateTask(before.id, { assignee_ids: assignees.map((a) => a.id) });
       setTasks((prev) => prev.map((t) => (t.id === before.id ? updated : t)));
+      if (sendUpdate) sendKanbanUpdate(updated);
     } catch (err) {
       console.error(err);
       setTasks((prev) => prev.map((t) => (t.id === before.id ? before : t)));
@@ -50,7 +53,7 @@ export default function KanbanAssigneeView() {
 
   return (
     <>
-    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה" actions={<TaskFilters />}>
+    <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה" actions={<div className="flex flex-wrap items-center gap-3"><KanbanSendUpdate checked={sendUpdate} onChange={setSendUpdate} /><TaskFilters /></div>}>
       <div className="grid gap-3 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
         {columns.map((col) => {
           const colTasks = tasks.filter((t) =>
@@ -80,6 +83,7 @@ export default function KanbanAssigneeView() {
                     key={t.id}
                     task={t}
                     saving={savingIds.includes(t.id)}
+                    sending={sendUpdate}
                     onOpen={() => setEditingTask(t)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />

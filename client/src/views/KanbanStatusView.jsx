@@ -7,19 +7,21 @@ import PageFrame from '../components/PageFrame.jsx';
 import TaskFilters from '../components/TaskFilters.jsx';
 import { filterParams } from '../taskFilters.js';
 import TaskFormModal from '../components/TaskFormModal.jsx';
+import KanbanSendUpdate, { sendKanbanUpdate, useKanbanSendUpdate } from '../components/KanbanSendUpdate.jsx';
 
 export default function KanbanStatusView() {
   const { refreshKey, statuses, filters } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [savingIds, setSavingIds] = useState([]);
   const [editingTask, setEditingTask] = useState(null);
+  const [sendUpdate, setSendUpdate] = useKanbanSendUpdate();
 
   useEffect(() => {
     api.getTasks(filterParams(filters)).then(setTasks).catch(console.error);
   }, [refreshKey, filters]);
 
-  // The card moves at once (the save also sends WhatsApp, which takes a moment) and shows that
-  // it's saving; if the save fails it goes back to its old column.
+  // The card moves at once and shows that it's saving; if the save fails it goes back to its old
+  // column. With "שלח וואטסאפ על כל שינוי" ticked, the WhatsApp update follows the save.
   async function moveTask(taskId, newStatus) {
     const before = tasks.find((t) => String(t.id) === String(taskId));
     if (!before || before.status === newStatus) return;
@@ -29,6 +31,7 @@ export default function KanbanStatusView() {
       // The answer carries the completion date the server set or cleared.
       const updated = await api.updateTask(before.id, { status: newStatus });
       setTasks((prev) => prev.map((t) => (t.id === before.id ? updated : t)));
+      if (sendUpdate) sendKanbanUpdate(updated);
     } catch (err) {
       console.error(err);
       setTasks((prev) => prev.map((t) => (t.id === before.id ? { ...t, status: before.status } : t)));
@@ -40,7 +43,7 @@ export default function KanbanStatusView() {
 
   return (
     <>
-    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה" actions={<TaskFilters />}>
+    <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה" actions={<div className="flex flex-wrap items-center gap-3"><KanbanSendUpdate checked={sendUpdate} onChange={setSendUpdate} /><TaskFilters /></div>}>
       {/* One column per status of the business, in its order; scrolls sideways when there are many.
           On a phone the columns are about half as wide (--kanban-col in index.css), so most
           statuses fit on the screen. */}
@@ -75,6 +78,7 @@ export default function KanbanStatusView() {
                     task={t}
                     showAssignees
                     saving={savingIds.includes(t.id)}
+                    sending={sendUpdate}
                     onOpen={() => setEditingTask(t)}
                     onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
                   />

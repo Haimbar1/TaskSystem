@@ -1,8 +1,8 @@
 import { PRIORITY_COLORS, PRIORITY_LABELS } from '../constants.js';
 
-// `saving`: the card was just moved and the server (which also sends the WhatsApp updates)
-// hasn't answered yet — it already sits in its new column, dimmed, and can't be dragged again.
-export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = false, saving = false }) {
+// `saving`: the card was just moved and the server hasn't answered yet — it already sits in its
+// new column, dimmed, and can't be dragged again. `sending`: a WhatsApp update goes out with it.
+export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = false, saving = false, sending = false }) {
   return (
     <div
       draggable={!saving}
@@ -14,7 +14,7 @@ export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = 
       }`}
     >
       <div className="text-sm font-medium text-gray-800">{task.title}</div>
-      {saving && <div className="text-xs text-emerald-700">שומר ושולח עדכון…</div>}
+      {saving && <div className="text-xs text-emerald-700">{sending ? 'שומר ושולח עדכון…' : 'שומר…'}</div>}
       <div className="flex items-center flex-wrap gap-1">
         {task.priority && (
           <span

@@ -421,7 +421,7 @@ router.get('/audit-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, 
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
 router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdminOrEmbed, async (req, res) => {
-  res.json(await listMessages(req.tenantId));
+  res.json(await listMessages(req.tenantId, { search: String(req.query.q || '') }));
 });
 
 // The active business's embed token (embedding the app in e.g. Monday; see embed.js). Super admin

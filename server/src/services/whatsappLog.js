@@ -102,14 +102,30 @@ export function statusForwardUrl(req) {
   return `${req.protocol}://${req.get('host')}/api/whatsapp/statuses`;
 }
 
-export async function listMessages(tenantId, limit = 200) {
+// `search` matches the recipient, task, message text, template and error. A phone typed the
+// Israeli way (050-1234567) also matches the stored international number (972501234567).
+export async function listMessages(tenantId, { search = '', limit = 200 } = {}) {
   await ensureTable();
+  const params = [tenantId, limit];
+  let where = 'tenant_id = $1';
+  const q = search.trim();
+  if (q) {
+    const like = (s) => `%${s.replace(/[\\%_]/g, '\\$&')}%`;
+    params.push(like(q));
+    const conditions = [`recipient_name ILIKE $3`, `task_title ILIKE $3`, `text ILIKE $3`, `template_name ILIKE $3`, `error ILIKE $3`];
+    const digits = q.replace(/[\s\-+()]/g, '');
+    if (/^\d+$/.test(digits)) {
+      params.push(like(digits.startsWith('0') ? `972${digits.slice(1)}` : digits));
+      conditions.push(`to_number LIKE $4`);
+    }
+    where += ` AND (${conditions.join(' OR ')})`;
+  }
   const { rows } = await pool.query(
     `SELECT id, task_id, task_title, recipient_name, to_number, event_type, template_name, text, status, error,
             created_at, updated_at
-     FROM whatsapp_messages WHERE tenant_id = $1
+     FROM whatsapp_messages WHERE ${where}
      ORDER BY created_at DESC LIMIT $2`,
-    [tenantId, limit]
+    params
   );
   return rows;
 }

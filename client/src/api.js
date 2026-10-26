@@ -21,13 +21,13 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// Saving a task sends WhatsApp notifications server-side and returns them as `whatsappMessages`;
-// announce them so WhatsAppSentToast can tell the user who got one.
-function announceWhatsApp(task) {
-  if (task?.whatsappMessages?.length) {
-    window.dispatchEvent(new CustomEvent('whatsapp-sent', { detail: task.whatsappMessages }));
+// "עדכן על שינויים" sends the WhatsApp update server-side and returns the messages as
+// `whatsappMessages`; announce them so WhatsAppSentToast can tell the user who got one.
+function announceWhatsApp(result) {
+  if (result?.whatsappMessages?.length) {
+    window.dispatchEvent(new CustomEvent('whatsapp-sent', { detail: result.whatsappMessages }));
   }
-  return task;
+  return result;
 }
 
 // For the help assistant (components/HelpWidget.tsx): a plain fetch with this site's login cookie
@@ -36,10 +36,10 @@ export const helpFetch = (path, init = {}) => fetch(`${API_URL}${path}`, { crede
 export const api = {
   getTasks: (params = {}) => request(`/api/tasks?${new URLSearchParams(params)}`),
   getPendingTask: () => request('/api/tasks/pending-open'),
-  createTask: (data) =>
-    request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }).then(announceWhatsApp),
-  updateTask: (id, data) =>
-    request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then(announceWhatsApp),
+  createTask: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
+  updateTask: (id, data) => request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getPendingUpdate: (id) => request(`/api/tasks/${id}/pending-update`),
+  sendTaskUpdate: (id) => request(`/api/tasks/${id}/send-update`, { method: 'POST' }).then(announceWhatsApp),
   deleteTask: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   getTaskNotes: (id) => request(`/api/tasks/${id}/notes`),
   addTaskNote: (id, body) => request(`/api/tasks/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
@@ -67,7 +67,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ origin, sourceTenantId: tenant_id, phoneNumberId: whatsapp_phone_number_id }),
     }),
-  getWhatsAppLog: () => request('/api/tenants/whatsapp-log'),
+  getWhatsAppLog: (q = '') =>
+    request(`/api/tenants/whatsapp-log${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
   getAuditLog: () => request('/api/tenants/audit-log'),
   getTaskStatuses: () => request('/api/tenants/task-statuses'),
   updateTaskStatuses: (statuses) =>

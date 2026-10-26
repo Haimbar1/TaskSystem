@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import CloseSettingsButton from '../components/CloseSettingsButton.jsx';
 import { explainMetaError } from '../metaErrors.js';
@@ -66,19 +66,27 @@ export default function WhatsAppLogView() {
   const [messages, setMessages] = useState(null);
   const [error, setError] = useState('');
   const [openId, setOpenId] = useState(null);
+  const [search, setSearch] = useState('');
+  // Typing fires a load per pause; only the latest one's answer is shown.
+  const lastLoad = useRef(0);
 
   function load() {
+    const id = ++lastLoad.current;
     setError('');
     api
-      .getWhatsAppLog()
-      .then(setMessages)
+      .getWhatsAppLog(search)
+      .then((rows) => id === lastLoad.current && setMessages(rows))
       .catch((err) => {
+        if (id !== lastLoad.current) return;
         console.error(err);
         setError('לא ניתן לטעון את היומן');
       });
   }
 
-  useEffect(load, []);
+  useEffect(() => {
+    const timer = setTimeout(load, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <div className="bg-white border rounded-xl shadow-sm p-4">
@@ -96,13 +104,23 @@ export default function WhatsAppLogView() {
         </div>
       </div>
       <p className="text-gray-500 text-sm mb-3">
-        200 ההודעות האחרונות של העסק. "התקבלה ב-Meta" אומר ש-Meta קיבלה את הבקשה לשליחה; האם ההודעה באמת הגיעה לטלפון
+        200 ההודעות האחרונות של העסק (בחיפוש: 200 האחרונות שמתאימות). "התקבלה ב-Meta" אומר ש-Meta קיבלה את הבקשה לשליחה; האם ההודעה באמת הגיעה לטלפון
         (נשלחה / נמסרה / נקראה / נכשלה) מתעדכן כאן כש-Meta מדווחת על כך. לחיצה על שורה מציגה את נוסח ההודעה, ובהודעה שנכשלה גם הסבר מה לא בסדר ומה לעשות.
       </p>
 
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="חיפוש לפי נמען, טלפון, משימה, נוסח ההודעה או שגיאה"
+        className="w-full mb-3 px-3 py-2 rounded-lg border text-sm"
+      />
+
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {!messages && !error && <p className="text-gray-500 text-sm">טוען…</p>}
-      {messages?.length === 0 && <p className="text-gray-500 text-sm">עדיין לא נשלחו הודעות.</p>}
+      {messages?.length === 0 && (
+        <p className="text-gray-500 text-sm">{search.trim() ? 'לא נמצאו הודעות מתאימות.' : 'עדיין לא נשלחו הודעות.'}</p>
+      )}
 
       {messages?.length > 0 && (
         <div className="overflow-x-auto">

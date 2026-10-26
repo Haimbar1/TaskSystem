@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { PRIORITY_LABELS } from '../constants.js';
+import { PRIORITY_LABELS, STATUS_COLOR_OPTIONS, OVERDUE_ROW } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import AssigneePicker from '../components/AssigneePicker.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
-import { formatDate } from '../utils.js';
+import { formatDate, isOverdue } from '../utils.js';
 import PageFrame from '../components/PageFrame.jsx';
 import TaskFilters from '../components/TaskFilters.jsx';
 import { filterParams } from '../taskFilters.js';
@@ -12,7 +12,7 @@ import { filterParams } from '../taskFilters.js';
 // TODO: per-column filtering (the spec asks for sort + filter on every
 // column) — only sorting is wired up so far.
 export default function TableView() {
-  const { refreshKey, statusLabel, filters } = useAppContext();
+  const { refreshKey, statusLabel, statuses, filters } = useAppContext();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [sort, setSort] = useState({ col: 'created_at', dir: 'desc' });
@@ -45,6 +45,13 @@ export default function TableView() {
     }
   }
 
+  // Each row in its status's color; past its due date (and not finished / paused) — red (Haim, 2026-10-26)
+  function rowColor(t) {
+    if (isOverdue(t, statuses)) return OVERDUE_ROW;
+    const color = statuses.find((s) => s.key === t.status)?.color;
+    return (STATUS_COLOR_OPTIONS[color] || STATUS_COLOR_OPTIONS.gray).row;
+  }
+
   function handleSaved(updated) {
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
@@ -66,8 +73,38 @@ export default function TableView() {
   return (
     <>
       <PageFrame title="כל המשימות" subtitle={`${tasks.length} משימות`} actions={<TaskFilters />}>
+      {/* On a phone: one card per task, so every task shows without sliding sideways. */}
+      <div className="sm:hidden space-y-2">
+        {tasks.map((t) => (
+          <div key={t.id} className={`border rounded-lg p-3 space-y-1.5 ${rowColor(t) || 'bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => setEditingTask(t)}
+              className="block w-full text-right font-medium text-emerald-700 break-words"
+            >
+              {t.title}
+            </button>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+              <span>{statusLabel(t.status)}</span>
+              <span>עדיפות: {PRIORITY_LABELS[t.priority]}</span>
+              {t.due_date && (
+                <span className={isOverdue(t, statuses) ? 'text-red-700 font-semibold' : ''}>
+                  יעד: {formatDate(t.due_date)}{isOverdue(t, statuses) ? ' (באיחור)' : ''}
+                </span>
+              )}
+              {t.completed_at && <span>בוצע: {formatDate(t.completed_at)}</span>}
+              <span>נוצר: {formatDate(t.created_at)}</span>
+            </div>
+            <AssigneePicker
+              users={users}
+              selectedIds={(t.assignees || []).map((a) => a.id)}
+              onChange={(ids) => updateAssignees(t.id, ids)}
+            />
+          </div>
+        ))}
+      </div>
       {/* Wider than a phone: the table scrolls sideways inside its frame, not the whole page. */}
-      <div className="overflow-x-auto">
+      <div className="hidden sm:block overflow-x-auto">
       <table className="w-full whitespace-nowrap">
         <thead>
           <tr>
@@ -84,7 +121,7 @@ export default function TableView() {
         </thead>
         <tbody>
           {tasks.map((t) => (
-            <tr key={t.id} className="border-b">
+            <tr key={t.id} className={`border-b ${rowColor(t)}`}>
               <td
                 className="p-2 cursor-pointer text-emerald-700 hover:underline"
                 onClick={() => setEditingTask(t)}
@@ -92,7 +129,10 @@ export default function TableView() {
                 {t.title}
               </td>
               <td className="p-2">{PRIORITY_LABELS[t.priority]}</td>
-              <td className="p-2">{formatDate(t.due_date)}</td>
+              <td className={`p-2 ${isOverdue(t, statuses) ? 'text-red-700 font-semibold' : ''}`}>
+                {formatDate(t.due_date)}
+                {isOverdue(t, statuses) && <span className="mr-1 text-xs">(באיחור)</span>}
+              </td>
               <td className="p-2">{statusLabel(t.status)}</td>
               <td className="p-2">
                 <AssigneePicker

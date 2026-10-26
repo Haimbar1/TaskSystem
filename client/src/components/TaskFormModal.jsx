@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
-import { PRIORITY_LABELS } from '../constants.js';
+import { PRIORITY_LABELS, STATUS_COLOR_OPTIONS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
 import TaskNotes from './TaskNotes.jsx';
@@ -10,7 +10,9 @@ import { isDoneLine, isItemLine, isLegacyList, hasItems, lineText, toggleLine, t
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
-  const { user } = useAppContext();
+  const { user, statuses } = useAppContext();
+  // The status, picked from the circles at the top (any status from any status), saved with "שמור"
+  const [status, setStatus] = useState(task?.status || '');
   // Logged in through an embed, everyone shares one login, so a new task must say who created it
   // (they're the one notified on its later changes).
   const needsCreator = !isEdit && user?.is_embed;
@@ -79,6 +81,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
       due_date: dueDate || null,
       assignee_ids: assigneeIds,
     };
+    if (isEdit && status && status !== task.status) payload.status = status;
     if (needsCreator) {
       payload.created_by = createdBy;
       // Whoever creates a task here is who's using this device (the "who am I" in Nav).
@@ -150,6 +153,44 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
           </div>
           {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
         </div>
+
+        {isEdit && statuses.length > 0 && (
+          // The statuses in board order, right to left; a click on any circle picks it (Haim, 2026-10-26)
+          <div>
+            <label className="block text-sm mb-1">סטטוס</label>
+            <div className="flex items-start overflow-x-auto pb-1">
+              {statuses.map((s, i) => {
+                const at = statuses.findIndex((x) => x.key === status);
+                const colors = STATUS_COLOR_OPTIONS[s.color] || STATUS_COLOR_OPTIONS.gray;
+                const current = s.key === status;
+                const passed = at > -1 && i < at;
+                return (
+                  <Fragment key={s.key}>
+                    {i > 0 && <span className={`h-0.5 flex-1 min-w-3 mt-4 ${passed || current ? colors.bar : 'bg-gray-200'}`} />}
+                    <button
+                      type="button"
+                      onClick={() => setStatus(s.key)}
+                      title={current ? `הסטטוס עכשיו: ${s.label}` : `העבר ל"${s.label}"`}
+                      className="flex flex-col items-center gap-1 w-16 shrink-0 group"
+                    >
+                      <span
+                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold transition ${
+                          current ? `${colors.bar} border-transparent text-white ring-2 ring-offset-1 ring-gray-300` : passed ? `bg-white ${colors.ring}` : 'bg-white border-gray-300 text-gray-400 group-hover:border-gray-500'
+                        }`}
+                      >
+                        {passed ? '✓' : i + 1}
+                      </span>
+                      <span className={`text-xs text-center leading-tight ${current ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{s.label}</span>
+                    </button>
+                  </Fragment>
+                );
+              })}
+            </div>
+            {status !== task.status && (
+              <p className="text-xs text-amber-700 mt-1">הסטטוס ישתנה ל"{statuses.find((s) => s.key === status)?.label}" כשתלחצו "שמור"</p>
+            )}
+          </div>
+        )}
 
         {needsCreator && (
           <div>

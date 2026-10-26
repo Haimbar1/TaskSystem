@@ -11,6 +11,16 @@ export function formatDate(value) {
   return `${MONTHS[parseInt(month, 10) - 1]}/${day}/${year.slice(2)}`;
 }
 
+// Overdue = the due date has passed (Israel's date) and the task isn't in an ending status or
+// "מושהה" — the same rule as the daily overdue reminder (server/src/services/overdueCheck.js).
+export function isOverdue(task, statuses) {
+  const due = toDateInputValue(task?.due_date);
+  if (!due || task.status === 'paused') return false;
+  if (statuses.find((s) => s.key === task.status)?.is_final) return false;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
+  return due < today;
+}
+
 // yyyy-mm-dd, suitable for <input type="date">.
 export function toDateInputValue(value) {
   if (!value) return '';

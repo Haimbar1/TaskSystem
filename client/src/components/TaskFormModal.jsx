@@ -85,55 +85,30 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     return payload;
   }
 
-  // "עדכן על שינויים": WhatsApp no longer goes out on every save (Haim, 2026-10-26) — the changes
-  // since the last update wait for this button (server/src/services/notifications.js). Unsaved
-  // edits in the form are saved first, and the window stays open to show what happened.
+  // "שלח עדכון בוואטסאפ" next to "שמור" (Haim, 2026-10-26: a checkbox instead of a separate button,
+  // off by default): saving sends no WhatsApp unless it's ticked — then the changes since the last
+  // update go out once the save is done (server/src/services/notifications.js), and
+  // WhatsAppSentToast says who got them.
+  const [sendUpdate, setSendUpdate] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(null); // { changes, recipients }
-  const [update, setUpdate] = useState({ state: 'idle', text: '' }); // idle / sending / sent / info / error
   useEffect(() => {
     if (isEdit) api.getPendingUpdate(task.id).then(setPendingUpdate).catch(() => setPendingUpdate(null));
   }, [isEdit, task?.id]);
-  const formChanged =
-    isEdit &&
-    (title !== (task.title || '') ||
-      description !== (task.description || '') ||
-      priority !== (task.priority || 'normal') ||
-      dueDate !== toDateInputValue(task.due_date) ||
-      (status && status !== task.status) ||
-      [...assigneeIds].sort().join() !== (task.assignees || []).map((a) => a.id).sort().join());
-
-  async function handleSendUpdate() {
-    setError('');
-    const payload = formChanged ? buildPayload() : null;
-    if (formChanged && !payload) return;
-    setUpdate({ state: 'sending', text: formChanged ? 'שומר ושולח עדכון…' : 'שולח עדכון…' });
-    try {
-      if (payload) onSaved?.(await api.updateTask(task.id, payload));
-      const result = await api.sendTaskUpdate(task.id);
-      const names = (list) => [...new Set(list.map((m) => m.recipientName || m.to))].join(', ');
-      const sent = result.whatsappMessages.filter((m) => m.sent);
-      const failed = result.whatsappMessages.filter((m) => !m.sent);
-      if (!result.changes.length) setUpdate({ state: 'info', text: 'אין שינויים חדשים מאז העדכון האחרון.' });
-      else if (sent.length) {
-        setUpdate({
-          state: failed.length ? 'error' : 'sent',
-          text: `העדכון נשלח בוואטסאפ אל: ${names(sent)}${failed.length ? ` · השליחה נכשלה אל: ${names(failed)}` : ''}`,
-        });
-      } else if (failed.length) setUpdate({ state: 'error', text: `שליחת הוואטסאפ נכשלה אל: ${names(failed)}. אפשר לנסות שוב.` });
-      else if (result.recipientCount) {
-        setUpdate({ state: 'error', text: 'לא נשלחה הודעה: לנמענים אין מספר טלפון, או שוואטסאפ לא מחובר לעסק.' });
-      } else {
-        setUpdate({
-          state: 'info',
-          text: 'אין למי לשלוח את העדכון: למשימה אין אחראים, או שהשינויים (כותרת, עדיפות, תאריך יעד) לא נשלחים בוואטסאפ.',
-        });
+  const sendUpdateBox = (
+    <label
+      className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer select-none"
+      title={
+        pendingUpdate?.changes?.length
+          ? `שינויים שעוד לא עודכנו: ${pendingUpdate.changes.join(' · ')}` +
+            (pendingUpdate.recipients.length ? `\nיישלח בוואטסאפ אל: ${pendingUpdate.recipients.join(', ')}` : '')
+          : 'עם השמירה נשלח בוואטסאפ עדכון על השינויים מאז העדכון האחרון'
       }
-      api.getPendingUpdate(task.id).then(setPendingUpdate).catch(() => {});
-    } catch (err) {
-      console.error(err);
-      setUpdate({ state: 'error', text: `שליחת העדכון נכשלה: ${err.message}` });
-    }
-  }
+    >
+      <input type="checkbox" checked={sendUpdate} onChange={(e) => setSendUpdate(e.target.checked)} />
+      שלח עדכון בוואטסאפ
+      {pendingUpdate?.changes?.length > 0 && <span className="w-2 h-2 rounded-full bg-amber-500" />}
+    </label>
+  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -147,14 +122,23 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     // The window closes at once and the save goes on in the background (Haim, 2026-10-26: saving
     // waited for the WhatsApp messages / the check whether any are due). An edited task shows its
     // changes right away; the server's copy replaces it when it answers, or a failure notice
-    // (WhatsAppSentToast) shows then. Saving sends no WhatsApp — "עדכן על שינויים" does.
+    // (WhatsAppSentToast) shows then. WhatsApp goes out only with "שלח עדכון בוואטסאפ" ticked.
     if (isEdit) {
       onSaved?.({ ...task, ...payload, assignees: users.length ? users.filter((u) => assigneeIds.includes(u.id)) : task.assignees });
     }
     onClose();
     const name = title.trim();
     (isEdit ? api.updateTask(task.id, payload) : api.createTask(payload))
-      .then((saved) => (onSaved || onCreated)?.(saved))
+      .then((saved) => {
+        (onSaved || onCreated)?.(saved);
+        if (!sendUpdate) return;
+        api.sendTaskUpdate(saved.id).catch((err) => {
+          console.error(err);
+          window.dispatchEvent(new CustomEvent('task-save-failed', {
+            detail: `המשימה "${name}" נשמרה, אבל שליחת העדכון בוואטסאפ נכשלה: ${err.message}`,
+          }));
+        });
+      })
       .catch((err) => {
         console.error(err);
         if (isEdit) onSaved?.(task); // back to what's really saved
@@ -195,26 +179,8 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         <div className="sticky -top-4 -mx-4 -mt-4 px-4 pt-4 pb-2 bg-white border-b z-10">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
-            <div className="flex flex-wrap justify-end gap-2">
-              {isEdit && (
-                <button
-                  type="button"
-                  onClick={handleSendUpdate}
-                  disabled={update.state === 'sending'}
-                  title={
-                    pendingUpdate?.changes?.length
-                      ? `שינויים שעוד לא עודכנו: ${pendingUpdate.changes.join(' · ')}` +
-                        (pendingUpdate.recipients.length ? `\nיישלח בוואטסאפ אל: ${pendingUpdate.recipients.join(', ')}` : '')
-                      : 'שולח בוואטסאפ את השינויים שנעשו מאז העדכון האחרון (שינויים שלא נשמרו נשמרים קודם)'
-                  }
-                  className="relative px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 text-sm hover:bg-emerald-50 disabled:opacity-50"
-                >
-                  {update.state === 'sending' ? 'שולח…' : 'עדכן על שינויים'}
-                  {(pendingUpdate?.changes?.length > 0 || formChanged) && update.state !== 'sending' && (
-                    <span className="absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white" />
-                  )}
-                </button>
-              )}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {sendUpdateBox}
               <button type="button" onClick={handleCancel} className="px-3 py-1.5 rounded-lg border text-sm">
                 ביטול
               </button>
@@ -227,16 +193,6 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
               </button>
             </div>
           </div>
-          {update.state !== 'idle' && (
-            <p
-              role="status"
-              className={`text-sm mt-1 ${
-                { sending: 'text-gray-500', sent: 'text-emerald-700', info: 'text-gray-600', error: 'text-red-600' }[update.state]
-              }`}
-            >
-              {update.text}
-            </p>
-          )}
           {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
         </div>
 
@@ -440,7 +396,8 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
           ) : (
             <span />
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {sendUpdateBox}
             <button type="button" onClick={handleCancel} className="px-3 py-2 rounded-lg border">
               ביטול
             </button>

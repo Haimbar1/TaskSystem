@@ -41,10 +41,12 @@ export default function KanbanStatusView() {
   return (
     <>
     <PageFrame title="קנבן לפי סטטוס" subtitle="גררי משימה בין עמודות כדי לעדכן את הסטטוס שלה · לחיצה כפולה פותחת אותה" actions={<TaskFilters />}>
-      {/* One column per status of the business, in its order; scrolls sideways when there are many. */}
+      {/* One column per status of the business, in its order; scrolls sideways when there are many.
+          On a phone the columns are about half as wide (--kanban-col in index.css), so most
+          statuses fit on the screen. */}
       <div
-        className="grid gap-3 items-start overflow-x-auto"
-        style={{ gridTemplateColumns: `repeat(${statuses.length || 1}, minmax(180px, 1fr))` }}
+        className="kanban-status grid gap-2 sm:gap-3 items-start overflow-x-auto"
+        style={{ gridTemplateColumns: `repeat(${statuses.length || 1}, minmax(var(--kanban-col), 1fr))` }}
       >
         {statuses.map((status) => {
           const colTasks = tasks.filter((t) => t.status === status.key);

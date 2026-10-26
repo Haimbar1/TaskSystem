@@ -68,7 +68,9 @@ export default function WhatsAppSettingsView() {
   // didn't say.
   function numberLabel(s) {
     if (!s.display_phone_number) return `Phone Number ID ${s.whatsapp_phone_number_id}`;
-    return s.verified_name ? `${s.display_phone_number} · ${s.verified_name}` : s.display_phone_number;
+    // kept left-to-right ("+972 50-…") inside Hebrew text; an <option> can't hold a <bdi>
+    const phone = `⁦${s.display_phone_number}⁩`;
+    return s.verified_name ? `${phone} · ${s.verified_name}` : phone;
   }
 
   // Super admin: move a WhatsApp number (with its WABA and token) into this business.
@@ -354,6 +356,10 @@ export default function WhatsAppSettingsView() {
         <h3 className="font-semibold">מתי ולמי נשלחות הודעות</h3>
         <ul className="list-disc pr-5 space-y-1 text-gray-700">
           <li>
+            <span className="font-medium">רק בלחיצה על "עדכן על שינויים"</span> — שמירת משימה לא שולחת וואטסאפ. בחלון
+            המשימה, הכפתור "עדכן על שינויים" שולח הודעה אחת עם כל השינויים מאז העדכון הקודם, לנמענים שלפי הכללים כאן.
+          </li>
+          <li>
             <span className="font-medium">רק אחרי שיש אחראי</span> — כל עוד למשימה אין אחראים, לא נשלחת עליה שום הודעה.
           </li>
           <li>
@@ -369,8 +375,8 @@ export default function WhatsAppSettingsView() {
             המשימה (תבנית "המשימה עודכנה").
           </li>
           <li>
-            <span className="font-medium">שינוי כותרת, עדיפות או תאריך יעד</span> — לא נשלחת הודעה (השינוי נרשם ב"יומן
-            פעולות").
+            <span className="font-medium">שינוי כותרת, עדיפות או תאריך יעד</span> — לבדו לא שולח הודעה (השינוי נרשם
+            ב"יומן פעולות"); כשנשלח עדכון מסיבה אחרת, הוא מופיע בפירוט השינויים.
           </li>
           <li>
             <span className="font-medium">משימה באיחור</span> — בבדיקה האוטומטית, פעם ביום בשעה שנבחרה למטה: לאחראים על כל
@@ -381,7 +387,7 @@ export default function WhatsAppSettingsView() {
         <OverdueCheckSettings />
         <p className="text-gray-500">
           מי שביצע את השינוי לא מקבל הודעה על עצמו, והודעות נשלחות רק לאנשי העסק עצמו (לא למנהל המערכת כשהוא עובד
-          בתוך העסק) ורק למשתמשים שיש להם מספר טלפון. אחרי שמירת משימה
+          בתוך העסק) ורק למשתמשים שיש להם מספר טלפון. אחרי לחיצה על "עדכן על שינויים"
           מופיעה הודעה קצרה בפינת המסך: למי נשלח וואטסאפ, ולמי השליחה נכשלה. כל ההודעות היוצאות ומה עלה בגורלן (נמסרה,
           נקראה, נכשלה ולמה) מופיעות ב"יומן הודעות וואטסאפ" שבתפריט ההגדרות.
         </p>

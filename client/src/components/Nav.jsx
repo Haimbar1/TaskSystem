@@ -66,7 +66,8 @@ export default function Nav() {
             <NavLink to="/kanban/status" className={linkClass}>
               קנבן לפי סטטוס
             </NavLink>
-            <NavLink to="/kanban/assignee" className={linkClass}>
+            {/* Not on a phone (Haim, 2026-10-25) — the status Kanban covers it there. */}
+            <NavLink to="/kanban/assignee" className={(s) => `hidden sm:block ${linkClass(s)}`}>
               קנבן לפי אחראי
             </NavLink>
             {/* Embed login has no settings menu; it manages its own business's people here. */}

@@ -1,5 +1,6 @@
 // The task search's state (kept in AppContext, edited by components/TaskFilters.jsx) and how it
-// becomes GET /api/tasks parameters: words in the title or description, and a period — this week
+// becomes GET /api/tasks parameters: words in any field (title, description, notes, assignees,
+// status, priority), and a period — this week
 // (Sunday to Saturday), this month, or between two dates — on the due, created or completed date.
 export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '' };
 

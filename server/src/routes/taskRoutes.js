@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { logActivityAndNotify } from '../services/notifications.js';
+import { logActivity, previewPendingUpdate, sendPendingUpdate } from '../services/notifications.js';
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 import { takePendingTask } from './openTaskRoutes.js';
 import { getStatuses, finalKeys } from '../services/taskStatuses.js';
 import { actorFor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
 import { listNotes, addNote } from '../services/taskNotes.js';
+import { PRIORITY_LABELS } from '../labels.js';
 
 const router = Router();
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
@@ -50,11 +51,24 @@ router.get('/', async (req, res) => {
     params.push(assignee);
     where += ` AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $${params.length})`;
   }
-  // The search bar (components/TaskFilters.jsx): words in the title or description…
+  // The search bar (components/TaskFilters.jsx): words in the title, description, notes or an
+  // assignee's name, or (part of) the status or priority as it's shown…
   const text = String(q || '').trim();
   if (text) {
     params.push(`%${text.replace(/[\\%_]/g, '\\$&')}%`);
-    where += ` AND (t.title ILIKE $${params.length} OR t.description ILIKE $${params.length})`;
+    const like = `$${params.length}`;
+    const lower = text.toLowerCase();
+    const shown = (labels) => labels.filter(([, label]) => label.toLowerCase().includes(lower)).map(([key]) => key);
+    const statuses = await getStatuses(req.tenantId);
+    params.push(shown(statuses.map((s) => [s.key, s.label])));
+    const statusKeys = `$${params.length}`;
+    params.push(shown(Object.entries(PRIORITY_LABELS)));
+    const priorityKeys = `$${params.length}`;
+    where += ` AND (t.title ILIKE ${like} OR t.description ILIKE ${like}
+      OR EXISTS (SELECT 1 FROM task_notes n WHERE n.task_id = t.id AND n.body ILIKE ${like})
+      OR EXISTS (SELECT 1 FROM task_assignees sa JOIN users su ON su.id = sa.user_id
+                 WHERE sa.task_id = t.id AND su.name ILIKE ${like})
+      OR t.status = ANY(${statusKeys}::text[]) OR t.priority::text = ANY(${priorityKeys}::text[]))`;
   }
   // …and a period (inclusive days, Israel time) on the chosen date.
   const dateCol = {
@@ -167,7 +181,7 @@ router.post('/', async (req, res) => {
       task,
       details: assignee_ids.length ? `אחראים: ${await userNames(assignee_ids)}` : null,
     });
-    const whatsappMessages = await logActivityAndNotify({
+    await logActivity({
       task,
       userId: creatorId,
       field: 'created',
@@ -175,7 +189,7 @@ router.post('/', async (req, res) => {
       newValue: null,
       eventType: 'assigned',
     });
-    res.status(201).json({ ...task, whatsappMessages });
+    res.status(201).json(task);
   } catch (err) {
     console.error('POST /api/tasks failed:', err);
     await client.query('ROLLBACK');
@@ -257,10 +271,8 @@ router.patch('/:id', async (req, res) => {
     req.actor = await actorFor(req);
     const actorId = req.actor.userId || req.user.id;
 
-    // One activity-log entry (and one notification fan-out) per changed field —
-    // status changes are what the spec calls out specifically, but every field
-    // is logged the same way.
-    const whatsappMessages = [];
+    // One activity-log entry per changed field. WhatsApp waits for "עדכן על שינויים"
+    // (POST /:id/send-update below).
     for (const [key, value] of Object.entries(fields)) {
       if (!sameValue(existing[key], value)) {
         await recordAction(req, {
@@ -268,7 +280,7 @@ router.patch('/:id', async (req, res) => {
           task: updated,
           details: await describeFieldChange(req.tenantId, key, existing[key], value),
         });
-        const messages = await logActivityAndNotify({
+        await logActivity({
           task: updated,
           userId: actorId,
           field: key,
@@ -276,7 +288,6 @@ router.patch('/:id', async (req, res) => {
           newValue: value,
           eventType: key === 'status' ? 'status_changed' : 'field_changed',
         });
-        whatsappMessages.push(...messages);
       }
     }
 
@@ -290,7 +301,7 @@ router.patch('/:id', async (req, res) => {
           task: updated,
           details: `אחראים: ${await userNames(previousAssigneeIds)} ← ${await userNames(assignee_ids)}`,
         });
-        const messages = await logActivityAndNotify({
+        await logActivity({
           task: updated,
           userId: actorId,
           field: 'assignees',
@@ -298,7 +309,6 @@ router.patch('/:id', async (req, res) => {
           newValue: assignee_ids.join(','),
           eventType: 'assigned',
         });
-        whatsappMessages.push(...messages);
       }
     }
 
@@ -307,7 +317,7 @@ router.patch('/:id', async (req, res) => {
        JOIN users u ON u.id = ta.user_id WHERE ta.task_id = $1`,
       [id]
     );
-    res.json({ ...updated, assignees: assigneeRows, whatsappMessages });
+    res.json({ ...updated, assignees: assigneeRows });
   } catch (err) {
     console.error('PATCH /api/tasks/:id failed:', err);
     await client.query('ROLLBACK');
@@ -315,6 +325,31 @@ router.patch('/:id', async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+// The task window's "עדכן על שינויים": the changes since the last WhatsApp update and who'd get it…
+router.get('/:id/pending-update', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(await previewPendingUpdate(rows[0]));
+});
+
+// …and sending it (services/notifications.js): { changes, recipientCount, whatsappMessages, sent }.
+router.post('/:id/send-update', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  const task = rows[0];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  req.actor = await actorFor(req);
+  const result = await sendPendingUpdate({ task, userId: req.actor.userId || req.user.id });
+  if (result.changes.length) {
+    const sentTo = [...new Set(result.whatsappMessages.filter((m) => m.sent).map((m) => m.recipientName))];
+    await recordAction(req, {
+      action: 'task_updated',
+      task,
+      details: `עדכון וואטסאפ${sentTo.length ? ` נשלח אל: ${sentTo.join(', ')}` : ' — לא נשלח לאף אחד'}`,
+    });
+  }
+  res.json(result);
 });
 
 router.delete('/:id', async (req, res) => {

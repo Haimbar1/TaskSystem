@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 
-const ICONS = { CRM: '📇', WHATSAPP: '💬', TASKS: '✅', BOTAPP: '🤖' };
+// The messages system's icon is green (WhatsApp's color) — the 💬 emoji isn't.
+const WA_ICON = (
+  <svg viewBox="0 0 24 24" className="w-7 h-7">
+    <path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z" />
+    <circle cx="8" cy="12" r="1.3" fill="#fff" />
+    <circle cx="12" cy="12" r="1.3" fill="#fff" />
+    <circle cx="16" cy="12" r="1.3" fill="#fff" />
+  </svg>
+);
+
+const ICONS = { CRM: '📇', WHATSAPP: WA_ICON, TASKS: '✅', BOTAPP: '🤖' };
+
+// Short labels — the portal's names start with "מערכת", which cut off the actual name.
+const NAMES = { CRM: 'CRM', WHATSAPP: 'ואטסאפ', TASKS: 'משימות', BOTAPP: 'בוט' };
+const shortName = (m) => NAMES[m.key.toUpperCase()] || m.name.replace(/^מערכת\s+/, '');
 
 export default function AppSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,7 +89,7 @@ export default function AppSwitcher() {
                   className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   <span className="text-2xl">{ICONS[m.key.toUpperCase()] || m.icon || '🔗'}</span>
-                  <span className="text-[10px] text-gray-600 truncate w-full text-center">{m.name}</span>
+                  <span className="text-xs text-gray-600 truncate w-full text-center">{shortName(m)}</span>
                 </button>
               ))}
             </div>

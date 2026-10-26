@@ -27,8 +27,9 @@ export default function TaskFilters() {
         type="search"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="🔍 חיפוש בכותרת ובתיאור"
-        className={`${field} w-44 sm:w-56`}
+        placeholder="🔍 חיפוש: משימה, תיאור, הערות, אחראי, סטטוס, עדיפות"
+        title="חיפוש בכותרת, בתיאור, בהערות, בשמות האחראים, בסטטוס ובעדיפות"
+        className={`${field} w-full sm:w-80`}
       />
       <select value={filters.period} onChange={(e) => set({ period: e.target.value })} className={field}>
         {Object.entries(PERIODS).map(([value, label]) => (

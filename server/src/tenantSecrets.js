@@ -6,11 +6,11 @@ import { pool } from './db.js';
 // BotApp so they're entered once. This reads the task system's share of them server-to-server,
 // signed with SSO_SHARED_SECRET, and writes what the "הגדרות וואטסאפ" screen saves back into it.
 //
-// Priority, as in the other apps: the original business (the optics, portal business 1) reads
-// the Vercel environment first; every business then reads the vault, then the value saved on its
-// own tenants row (businesses not linked to the portal, or saved before the vault was connected).
-// Only the original business ever falls back to the environment, so no other business can end up
-// sending from its number.
+// Priority, as in the other apps (Haim, 2026-10-25: "שיהיה רק בפורטל"): the vault first, for
+// every business; then, for the original business (the optics, portal business 1) only, the Vercel
+// environment; then the value saved on the business's own tenants row (a business not linked to
+// the portal). Only the original business ever falls back to the environment, so no other business
+// can end up sending from its number.
 
 const PORTAL_URL = process.env.PORTAL_URL || 'https://portal.smartesek.com';
 const MODULE = 'tasks';
@@ -71,13 +71,16 @@ export async function whatsappCredentials(tenantId) {
   const vault = portalId ? await fetchFromPortal(portalId) : {};
   const values = {};
   const sources = {};
+  // The three go together: a portal that has the token and the number decides all three, so a
+  // token from one place is never paired with a number from another.
+  const vaultComplete = !!(vault.META_WA_ACCESS_TOKEN && vault.META_PHONE_NUMBER_ID);
   for (const f of WHATSAPP_FIELDS) {
-    if (isOriginal && process.env[f.env]) {
+    if (vaultComplete || (vault[f.vaultKey] && !(isOriginal && process.env[f.env]))) {
+      values[f.column] = vault[f.vaultKey] || '';
+      sources[f.column] = vault[f.vaultKey] ? 'vault' : '';
+    } else if (isOriginal && process.env[f.env]) {
       values[f.column] = process.env[f.env];
       sources[f.column] = 'env';
-    } else if (vault[f.vaultKey]) {
-      values[f.column] = vault[f.vaultKey];
-      sources[f.column] = 'vault';
     } else {
       values[f.column] = row[f.column] || '';
       sources[f.column] = row[f.column] ? 'local' : '';

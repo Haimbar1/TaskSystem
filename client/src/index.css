@@ -8,3 +8,13 @@ body {
   overflow-x: hidden;
   overflow-x: clip;
 }
+
+/* The status Kanban's column width (views/KanbanStatusView.jsx): about half on a phone. */
+.kanban-status {
+  --kanban-col: 180px;
+}
+@media (max-width: 639px) {
+  .kanban-status {
+    --kanban-col: 100px;
+  }
+}

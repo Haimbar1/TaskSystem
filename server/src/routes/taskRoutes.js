@@ -138,7 +138,8 @@ router.post('/:id/notes', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { title, description, priority = 'normal', due_date, assignee_ids = [] } = req.body;
+  const { description, priority = 'normal', due_date, assignee_ids = [] } = req.body;
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : req.body.title;
 
   // Logged in through an embed (shared service user): the real creator is picked in the form, so
   // they're the one recorded (and notified on later changes) instead of the service user.
@@ -203,6 +204,7 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
   const { assignee_ids, ...fields } = req.body; // { status?, priority?, title?, description?, due_date?, assignee_ids? }
+  if (typeof fields.title === 'string') fields.title = fields.title.trim();
 
   const { rows: existingRows } = await pool.query(
     'SELECT * FROM tasks WHERE id = $1 AND tenant_id = $2',

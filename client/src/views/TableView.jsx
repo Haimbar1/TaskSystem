@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { PRIORITY_LABELS, STATUS_COLOR_OPTIONS, OVERDUE_ROW } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import AssigneePicker from '../components/AssigneePicker.jsx';
+import { sendKanbanUpdate } from '../components/KanbanSendUpdate.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
 import { formatDate, isOverdue } from '../utils.js';
 import PageFrame from '../components/PageFrame.jsx';
@@ -30,7 +31,9 @@ export default function TableView() {
     setSort((s) => ({ col, dir: s.col === col && s.dir === 'asc' ? 'desc' : 'asc' }));
   }
 
-  // Shown at once; the save (which also sends WhatsApp) replaces it when it answers, or undoes it.
+  // Shown at once; the save replaces it when it answers, or undoes it. Saving doesn't message
+  // anyone by itself, so the WhatsApp update follows — the new person hears about the task
+  // (Haim, 2026-10-27).
   async function updateAssignees(taskId, assigneeIds) {
     const before = tasks.find((t) => t.id === taskId);
     const assignees = users.filter((u) => assigneeIds.includes(u.id));
@@ -38,6 +41,7 @@ export default function TableView() {
     try {
       const updated = await api.updateTask(taskId, { assignee_ids: assigneeIds });
       setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      sendKanbanUpdate(updated);
     } catch (err) {
       console.error(err);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? before : t)));

@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 const MENU_MAX_HEIGHT = 256;
 
 // The list opens fixed on top of the page (the table around it clips anything that sticks out),
-// collects ticks while open, and saves once when it closes — every save also sends WhatsApp
+// collects ticks while open, and saves once when it closes ("שמור") — every save also sends WhatsApp
 // updates, so saving on each tick would message people about every intermediate state.
-// block: fills the width of its row (the task form) instead of sitting inline in a table cell.
+// block: the task form — fills the width of its row, and each tick goes straight into the form,
+// which has its own "שמור" (one save, not "אישור" and then "שמור" — Haim, 2026-10-27).
 // With many people the list gets a search box.
 const SEARCH_FROM = 8;
 
@@ -42,7 +43,7 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
     setOpen(false);
     const next = draftRef.current;
     const changed = next.length !== selectedIds.length || next.some((id) => !selectedIds.includes(id));
-    if (changed) onChange(next);
+    if (changed && !block) onChange(next);
   }
 
   useEffect(() => {
@@ -76,7 +77,11 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
   const selectedNames = users.filter((u) => shownIds.includes(u.id)).map((u) => u.name || u.email);
 
   function toggle(id) {
-    setDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
+    const d = draftRef.current;
+    const next = d.includes(id) ? d.filter((x) => x !== id) : [...d, id];
+    draftRef.current = next;
+    setDraft(next);
+    if (block) onChange(next);
   }
 
   const term = search.trim().toLowerCase();
@@ -121,13 +126,15 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
               {u.name || u.email}
             </label>
           ))}
-          <button
-            type="button"
-            onClick={closeMenu}
-            className="mt-2 w-full px-2 py-1 rounded bg-emerald-600 text-white text-sm"
-          >
-            אישור
-          </button>
+          {!block && (
+            <button
+              type="button"
+              onClick={closeMenu}
+              className="mt-2 w-full px-2 py-1 rounded bg-emerald-600 text-white text-sm"
+            >
+              שמור
+            </button>
+          )}
         </div>
       )}
     </div>

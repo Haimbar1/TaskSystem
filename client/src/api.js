@@ -68,7 +68,8 @@ export const api = {
       body: JSON.stringify({ origin, sourceTenantId: tenant_id, phoneNumberId: whatsapp_phone_number_id }),
     }),
   getWhatsAppLog: (q = '') =>
-    request(`/api/tenants/whatsapp-log${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
+    request(`/api/tenants/whatsapp-log${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`, { cache: 'no-store' }),
+  deleteWhatsAppLogMessage: (id) => request(`/api/tenants/whatsapp-log/${id}`, { method: 'DELETE' }),
   getAuditLog: () => request('/api/tenants/audit-log'),
   getTaskStatuses: () => request('/api/tenants/task-statuses'),
   updateTaskStatuses: (statuses) =>

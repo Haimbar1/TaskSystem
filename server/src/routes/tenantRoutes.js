@@ -5,7 +5,7 @@ import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '../embed.js';
 import { whatsappCredentials, writeToVault, forgetVaultCache } from '../tenantSecrets.js';
 import { listWhatsAppSystemAccounts, moveAccountToVault } from '../services/whatsappSystemAccounts.js';
-import { listMessages, statusForwardUrl } from '../services/whatsappLog.js';
+import { listMessages, deleteMessage, statusForwardUrl } from '../services/whatsappLog.js';
 import { listPhoneNumbers, listApprovedTemplates, wabaOfPhone } from '../services/whatsapp.js';
 import {
   TEMPLATE_EVENTS,
@@ -418,7 +418,15 @@ router.get('/audit-log', requireAuth, requireTenant, requireTenantAdmin, async (
 
 // The active business's outgoing WhatsApp log, newest first (see services/whatsappLog.js).
 router.get('/whatsapp-log', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  // Statuses change as Meta reports them; a cached copy would make "רענון" show stale ones.
+  res.set('Cache-Control', 'no-store');
   res.json(await listMessages(req.tenantId, { search: String(req.query.q || '') }));
+});
+
+router.delete('/whatsapp-log/:id', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(400).json({ error: 'מזהה לא תקין' });
+  if (!(await deleteMessage(req.tenantId, req.params.id))) return res.status(404).json({ error: 'ההודעה לא נמצאה' });
+  res.status(204).end();
 });
 
 // The active business's embed token (embedding the app in e.g. Monday; see embed.js). Super admin

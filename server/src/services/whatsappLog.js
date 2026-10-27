@@ -102,6 +102,13 @@ export function statusForwardUrl(req) {
   return `${req.protocol}://${req.get('host')}/api/whatsapp/statuses`;
 }
 
+// Removes one row from the business's log ("פח" in the log screen). Returns whether it existed.
+export async function deleteMessage(tenantId, id) {
+  await ensureTable();
+  const { rowCount } = await pool.query('DELETE FROM whatsapp_messages WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
+  return rowCount > 0;
+}
+
 // `search` matches the recipient, task, message text, template and error. A phone typed the
 // Israeli way (050-1234567) also matches the stored international number (972501234567).
 export async function listMessages(tenantId, { search = '', limit = 200 } = {}) {

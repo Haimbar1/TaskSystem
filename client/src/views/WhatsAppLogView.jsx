@@ -67,20 +67,39 @@ export default function WhatsAppLogView() {
   const [error, setError] = useState('');
   const [openId, setOpenId] = useState(null);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadedAt, setLoadedAt] = useState(null);
   // Typing fires a load per pause; only the latest one's answer is shown.
   const lastLoad = useRef(0);
 
   function load() {
     const id = ++lastLoad.current;
     setError('');
+    setLoading(true);
     api
       .getWhatsAppLog(search)
-      .then((rows) => id === lastLoad.current && setMessages(rows))
+      .then((rows) => {
+        if (id !== lastLoad.current) return;
+        setMessages(rows);
+        setLoadedAt(new Date());
+      })
       .catch((err) => {
         if (id !== lastLoad.current) return;
         console.error(err);
         setError('לא ניתן לטעון את היומן');
-      });
+      })
+      .finally(() => id === lastLoad.current && setLoading(false));
+  }
+
+  async function remove(m) {
+    if (!window.confirm(`למחוק את ההודעה ל${m.recipient_name || 'נמען'} מהיומן? לא ניתן לשחזר.`)) return;
+    try {
+      await api.deleteWhatsAppLogMessage(m.id);
+      setMessages((rows) => rows.filter((r) => r.id !== m.id));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'המחיקה נכשלה');
+    }
   }
 
   useEffect(() => {
@@ -88,17 +107,29 @@ export default function WhatsAppLogView() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Meta's delivery reports keep arriving while the log is open; pick them up without a click.
+  useEffect(() => {
+    const timer = setInterval(() => document.visibilityState === 'visible' && load(), 30000);
+    return () => clearInterval(timer);
+  }, [search]);
+
   return (
     <div className="bg-white border rounded-xl shadow-sm p-4">
       <div className="flex items-center justify-between mb-3 gap-2">
         <h2 className="font-semibold">יומן הודעות וואטסאפ</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {loadedAt && (
+            <span className="text-xs text-gray-400">
+              עודכן ב-{loadedAt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
           <button
             type="button"
             onClick={load}
-            className="px-3 py-1.5 rounded-lg border text-sm text-gray-600 hover:bg-gray-100"
+            disabled={loading}
+            className="px-3 py-1.5 rounded-lg border text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-60"
           >
-            רענון
+            {loading ? 'מרענן…' : 'רענון'}
           </button>
           <CloseSettingsButton />
         </div>
@@ -133,6 +164,7 @@ export default function WhatsAppLogView() {
                 <th className="py-2 px-2 font-medium">סוג</th>
                 <th className="py-2 px-2 font-medium">מצב</th>
                 <th className="py-2 px-2 font-medium">פירוט</th>
+                <th className="py-2 px-2" aria-label="מחיקה" />
               </tr>
             </thead>
             <tbody>
@@ -172,10 +204,26 @@ export default function WhatsAppLogView() {
                         </div>
                         {why?.title && !open && <div className="text-gray-400 mt-0.5">לחצו להסבר ומה לעשות</div>}
                       </td>
+                      <td className="py-2 px-2 text-left">
+                        <button
+                          type="button"
+                          title="מחיקת ההודעה מהיומן"
+                          aria-label="מחיקת ההודעה מהיומן"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(m);
+                          }}
+                          className="p-1 rounded text-red-600 hover:bg-red-50"
+                        >
+                          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+                          </svg>
+                        </button>
+                      </td>
                     </tr>
                     {open && (
                       <tr className="border-b bg-gray-50">
-                        <td colSpan={6} className="py-2 px-3">
+                        <td colSpan={7} className="py-2 px-3">
                           {why?.title && <ErrorHelp why={why} />}
                           <div className="text-xs text-gray-500 mb-1">תבנית: {m.template_name}</div>
                           <pre className="whitespace-pre-wrap font-sans text-sm">{m.text || '—'}</pre>

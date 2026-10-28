@@ -48,7 +48,7 @@ export default function KanbanStatusView() {
           On a phone the columns are about half as wide (--kanban-col in index.css), so most
           statuses fit on the screen. */}
       <div
-        className="kanban-status grid gap-2 sm:gap-3 items-start overflow-x-auto"
+        className="kanban-board grid gap-2 sm:gap-3 items-start overflow-x-auto"
         style={{ gridTemplateColumns: `repeat(${statuses.length || 1}, minmax(var(--kanban-col), 1fr))` }}
       >
         {statuses.map((status) => {

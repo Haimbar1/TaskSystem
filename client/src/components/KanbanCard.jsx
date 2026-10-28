@@ -9,7 +9,7 @@ export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = 
       onDragStart={onDragStart}
       onDoubleClick={saving ? undefined : onOpen}
       title="גרירה להעברה, לחיצה כפולה לפתיחה"
-      className={`bg-white border rounded-lg p-2 sm:p-3 mb-2 break-words shadow-sm transition-shadow space-y-2 ${
+      className={`bg-white border rounded-lg p-2 sm:p-2.5 mb-2 break-words shadow-sm transition-shadow space-y-2 ${
         saving ? 'opacity-60 cursor-wait border-emerald-300' : 'cursor-move hover:shadow-md'
       }`}
     >

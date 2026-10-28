@@ -54,7 +54,11 @@ export default function KanbanAssigneeView() {
   return (
     <>
     <PageFrame title="קנבן לפי אחראי" subtitle="גררי משימה בין אנשים כדי לשנות מי אחראי עליה · לחיצה כפולה פותחת אותה" actions={<div className="flex flex-wrap items-center gap-3"><KanbanSendUpdate checked={sendUpdate} onChange={setSendUpdate} /><TaskFilters /></div>}>
-      <div className="grid gap-3 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
+      {/* One column per person; never narrower than --kanban-col (index.css), scrolls sideways instead. */}
+      <div
+        className="kanban-board grid gap-2 sm:gap-3 items-start overflow-x-auto"
+        style={{ gridTemplateColumns: `repeat(${columns.length || 1}, minmax(var(--kanban-col), 1fr))` }}
+      >
         {columns.map((col) => {
           const colTasks = tasks.filter((t) =>
             col.id === UNASSIGNED

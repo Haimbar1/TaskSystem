@@ -9,12 +9,12 @@ body {
   overflow-x: clip;
 }
 
-/* The status Kanban's column width (views/KanbanStatusView.jsx): about half on a phone. */
-.kanban-status {
-  --kanban-col: 180px;
+/* Both Kanbans' minimum column width (views/Kanban*View.jsx): about half on a phone. */
+.kanban-board {
+  --kanban-col: 140px;
 }
 @media (max-width: 639px) {
-  .kanban-status {
+  .kanban-board {
     --kanban-col: 100px;
   }
 }

@@ -55,7 +55,7 @@ export default function App() {
     <AppProvider user={user}>
       <div dir="rtl" className="min-h-screen bg-gray-50">
         <Nav />
-        <main className="p-4 max-w-7xl mx-auto">
+        <main className="p-4 max-w-[1920px] mx-auto">
           <Routes>
             <Route path="/" element={<TableView />} />
             <Route path="/kanban/status" element={<KanbanStatusView />} />

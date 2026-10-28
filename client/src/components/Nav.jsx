@@ -40,7 +40,7 @@ export default function Nav() {
       <nav className="bg-gradient-to-l from-teal-950 to-teal-900 text-white shadow-md">
         {/* On a phone the view links go to a row of their own below (scrolling sideways by
             themselves), so the bar is never wider than the screen and the page can't slide. */}
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="max-w-[1920px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Embedded (shared business login): no portal identity to switch modules with. Its
                 gear has only what applies there (SettingsMenu), and no log out inside the iframe. */}

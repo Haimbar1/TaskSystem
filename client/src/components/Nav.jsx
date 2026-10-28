@@ -71,10 +71,11 @@ export default function Nav() {
             <NavLink to="/kanban/assignee" className={(s) => `hidden sm:block ${linkClass(s)}`}>
               קנבן לפי אחראי
             </NavLink>
-            {/* Embed login has no settings menu; it manages its own business's people here. */}
-            {user?.is_embed && (
-              <NavLink to="/users" className={linkClass}>
-                משתמשים
+            {/* The action log in the bar (Haim, 2026-10-28) — the business's people are in the gear
+                menu ("משתמשי העסק (Monday)"). */}
+            {canManageUsers && (
+              <NavLink to="/audit-log" className={linkClass}>
+                יומן פעולות
               </NavLink>
             )}
           </div>

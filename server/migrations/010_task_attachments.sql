@@ -14,3 +14,5 @@ CREATE TABLE IF NOT EXISTS task_attachments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS task_attachments_task_created ON task_attachments (task_id, created_at);
+-- A small JPEG copy of an image for the table's "תמונה" column, made by the uploading browser.
+ALTER TABLE task_attachments ADD COLUMN IF NOT EXISTS thumb BYTEA;

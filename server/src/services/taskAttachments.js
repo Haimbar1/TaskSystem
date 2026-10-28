@@ -20,10 +20,17 @@ CREATE TABLE IF NOT EXISTS task_attachments (
   data BYTEA NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS task_attachments_task_created ON task_attachments (task_id, created_at);`;
+CREATE INDEX IF NOT EXISTS task_attachments_task_created ON task_attachments (task_id, created_at);
+ALTER TABLE task_attachments ADD COLUMN IF NOT EXISTS thumb BYTEA;`;
+
+// The images the table shows a thumbnail of (TableView "תמונה"); the same list as INLINE_TYPES' images
+// in routes/taskRoutes.js.
+export const IMAGE_TYPE_SQL = "'^image/(png|jpe?g|gif|webp|bmp|avif)$'";
+export const MAX_THUMB_BYTES = 200 * 1024;
 
 let tableReady = false;
-async function ensureTable() {
+// Exported for the task list, which asks each task for its first image.
+export async function ensureTable() {
   if (tableReady) return;
   await pool.query(CREATE_TABLE);
   tableReady = true;
@@ -58,6 +65,29 @@ export async function getAttachment(taskId, attachmentId) {
     [attachmentId, taskId]
   ).catch(() => ({ rows: [] })); // not a uuid
   return rows[0] || null;
+}
+
+// A small copy of an image, made by the browser that uploaded it (no image library on the server).
+export async function setThumb(taskId, attachmentId, thumb) {
+  await ensureTable();
+  const { rowCount } = await pool.query(
+    'UPDATE task_attachments SET thumb = $3 WHERE id = $1 AND task_id = $2',
+    [attachmentId, taskId, thumb]
+  ).catch(() => ({ rowCount: 0 }));
+  return rowCount > 0;
+}
+
+// The small copy, or the image itself when it has none (uploaded before thumbnails existed).
+export async function getThumb(taskId, attachmentId) {
+  await ensureTable();
+  const { rows } = await pool.query(
+    `SELECT mime_type, thumb, CASE WHEN thumb IS NULL THEN data END AS data
+     FROM task_attachments WHERE id = $1 AND task_id = $2 AND mime_type ~* ${IMAGE_TYPE_SQL}`,
+    [attachmentId, taskId]
+  ).catch(() => ({ rows: [] }));
+  const row = rows[0];
+  if (!row) return null;
+  return row.thumb ? { mimeType: 'image/jpeg', data: row.thumb } : { mimeType: row.mime_type, data: row.data };
 }
 
 export async function deleteAttachment(taskId, attachmentId) {

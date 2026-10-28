@@ -5,13 +5,18 @@ import { PRIORITY_LABELS, STATUS_COLOR_OPTIONS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
 import TaskNotes from './TaskNotes.jsx';
-import TaskAttachments from './TaskAttachments.jsx';
+import TaskAttachments, { uploadAttachment } from './TaskAttachments.jsx';
 import AssigneePicker from './AssigneePicker.jsx';
 import { isDoneLine, isItemLine, isLegacyList, hasItems, lineText, toggleLine, toggleItems, typedMarks } from '../descriptionLines.js';
 
 export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDeleted }) {
   const isEdit = Boolean(task);
-  const { user, statuses } = useAppContext();
+  const { user, statuses, bumpRefresh } = useAppContext();
+  // A new task's files wait here until it's created (TaskAttachments); an existing task's upload at
+  // once, and then the views reload on close for the table's "תמונה".
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const attachmentsChanged = useRef(false);
+  useEffect(() => () => attachmentsChanged.current && bumpRefresh?.(), []);
   // The status, picked from the circles at the top (any status from any status), saved with "שמור"
   const [status, setStatus] = useState(task?.status || '');
   // Logged in through an embed, everyone shares one login, so a new task must say who created it
@@ -129,8 +134,19 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     }
     onClose();
     const name = title.trim();
+    const files = isEdit ? [] : pendingFiles.map((p) => p.file);
     (isEdit ? api.updateTask(task.id, payload) : api.createTask(payload))
-      .then((saved) => {
+      .then(async (saved) => {
+        // A new task's files go up before the views reload, so its thumbnail is there.
+        const failed = [];
+        for (const file of files) {
+          await uploadAttachment(saved.id, file).catch((err) => failed.push(`${file.name} (${err.message})`));
+        }
+        if (failed.length) {
+          window.dispatchEvent(new CustomEvent('task-save-failed', {
+            detail: `המשימה "${name}" נוצרה, אבל לא כל הקבצים צורפו: ${failed.join(', ')}`,
+          }));
+        }
         (onSaved || onCreated)?.(saved);
         if (!sendUpdate) return;
         api.sendTaskUpdate(saved.id).catch((err) => {
@@ -151,6 +167,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
 
   function handleCancel() {
     if (hasUnaddedNote && !window.confirm('יש הערת ביצוע שלא נוספה. לסגור בלי לשמור אותה?')) return;
+    if (pendingFiles.length && !window.confirm('הקבצים שצורפו יישמרו רק עם יצירת המשימה. לסגור בלי ליצור אותה?')) return;
     onClose();
   }
 
@@ -378,13 +395,16 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         </div>
 
         {isEdit ? (
-          <>
-            <TaskNotes taskId={task.id} onDraftChange={setHasUnaddedNote} />
-            <TaskAttachments taskId={task.id} />
-          </>
+          <TaskNotes taskId={task.id} onDraftChange={setHasUnaddedNote} />
         ) : (
-          <p className="text-xs text-gray-400">הערות ביצוע וקבצים מצורפים אפשר להוסיף אחרי יצירת המשימה.</p>
+          <p className="text-xs text-gray-400">הערות ביצוע אפשר להוסיף אחרי יצירת המשימה.</p>
         )}
+        <TaskAttachments
+          taskId={task?.id}
+          pending={pendingFiles}
+          onPendingChange={setPendingFiles}
+          onChange={() => (attachmentsChanged.current = true)}
+        />
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 

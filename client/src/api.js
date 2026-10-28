@@ -55,12 +55,20 @@ export const api = {
         'X-File-Type': file.type || 'application/octet-stream',
       },
     }),
+  setTaskAttachmentThumb: (id, attachmentId, blob) =>
+    request(`/api/tasks/${id}/attachments/${attachmentId}/thumb`, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': 'application/octet-stream' },
+    }),
   deleteTaskAttachment: (id, attachmentId) =>
     request(`/api/tasks/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
   // The file's contents as a Blob — fetched with the login cookie, so it works for <img> and links
   // through URL.createObjectURL (inside Monday too, where a plain <img src> to the API may lack it).
-  getTaskAttachmentBlob: async (id, attachmentId) => {
-    const res = await fetch(`${API_URL}/api/tasks/${id}/attachments/${attachmentId}`, { credentials: 'include' });
+  // thumb: the small copy (the table's "תמונה" column) instead of the file itself.
+  getTaskAttachmentBlob: async (id, attachmentId, { thumb = false } = {}) => {
+    const path = `/api/tasks/${id}/attachments/${attachmentId}${thumb ? '/thumb' : ''}`;
+    const res = await fetch(`${API_URL}${path}`, { credentials: 'include' });
     if (!res.ok) throw new Error(`API error ${res.status}`);
     return res.blob();
   },

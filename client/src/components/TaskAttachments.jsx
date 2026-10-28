@@ -3,10 +3,12 @@ import { api } from '../api.js';
 
 // "קבצים מצורפים" in the task form (server/src/services/taskAttachments.js): pick files, drop them
 // here, or paste (Ctrl+V) a screenshot or copied file anywhere in the task window. Images show as
-// thumbnails; clicking one opens it large.
+// thumbnails; clicking one opens it large. In a new task (no taskId yet) the files wait here and
+// TaskFormModal uploads them with uploadAttachment once the task is created.
 
 const MAX_BYTES = 4 * 1024 * 1024; // same as the server's MAX_BYTES
-const isImage = (a) => /^image\/(png|jpe?g|gif|webp|bmp|avif)$/i.test(a.mime_type);
+const THUMB_SIZE = 240; // px, the longer side of the table's thumbnail (shown at 40–48px, sharp on retina)
+export const isImage = (a) => /^image\/(png|jpe?g|gif|webp|bmp|avif)$/i.test(a.mime_type ?? a.type ?? '');
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -33,8 +35,75 @@ function nameForPasted(file) {
   return new File([file], `צילום-מסך_${stamp}.${ext}`, { type: file.type });
 }
 
-export default function TaskAttachments({ taskId }) {
-  const [items, setItems] = useState(null);
+// A small JPEG of an image (the server has no image library), or null if the browser can't read it.
+async function makeThumb(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, THUMB_SIZE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; // transparent PNGs on white, not black
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+  } catch {
+    return null;
+  }
+}
+
+// Uploads one file, and for an image its thumbnail too (a failed thumbnail only means the table
+// loads the full image instead).
+export async function uploadAttachment(taskId, file) {
+  const saved = await api.addTaskAttachment(taskId, file);
+  if (isImage(saved)) {
+    const thumb = await makeThumb(file);
+    if (thumb) await api.setTaskAttachmentThumb(taskId, saved.id, thumb).catch(console.error);
+  }
+  return saved;
+}
+
+// An image open large on a dark background; Esc or a click outside closes it.
+export function ImageLightbox({ url, name, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && (e.stopPropagation(), onClose());
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4" onClick={onClose}>
+      {url ? (
+        <img
+          src={url}
+          alt={name}
+          className="max-w-full max-h-[85vh] object-contain rounded shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className="text-white text-sm">טוען…</span>
+      )}
+      <div className="mt-3 flex items-center gap-3 text-white text-sm" onClick={(e) => e.stopPropagation()}>
+        <span className="truncate max-w-[60vw]">{name}</span>
+        {url && (
+          <a href={url} download={name} className="underline">
+            הורד
+          </a>
+        )}
+        <button type="button" onClick={onClose} className="underline">
+          סגור
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// taskId: an existing task (uploads at once). Without it: pending/onPendingChange hold the files
+// for the new task. onChange: the task's files changed (the table's thumbnail may be different).
+export default function TaskAttachments({ taskId, pending, onPendingChange, onChange }) {
+  const isNew = !taskId;
+  const [saved, setSaved] = useState(isNew ? [] : null);
   const [urls, setUrls] = useState({}); // attachment id -> object URL, for images
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState('');
@@ -44,27 +113,46 @@ export default function TaskAttachments({ taskId }) {
   const rootRef = useRef(null);
   const urlsRef = useRef({});
 
+  // A waiting file looks like a saved one, with the File itself in `file`.
+  const items = isNew
+    ? (pending || []).map((p) => ({
+        id: p.key,
+        file_name: p.file.name,
+        mime_type: p.file.type || 'application/octet-stream',
+        size_bytes: p.file.size,
+        created_at: p.addedAt,
+        file: p.file,
+      }))
+    : saved;
+
   useEffect(() => {
+    if (isNew) return;
     api
       .getTaskAttachments(taskId)
-      .then(setItems)
+      .then(setSaved)
       .catch((err) => {
         console.error(err);
         setError('לא ניתן לטעון את הקבצים');
       });
   }, [taskId]);
 
-  // Thumbnails: each image is fetched once, kept as an object URL until the form closes.
+  function keepUrl(id, url) {
+    urlsRef.current[id] = url;
+    setUrls({ ...urlsRef.current });
+  }
+
+  // Thumbnails: each image is read once, kept as an object URL until the form closes.
   useEffect(() => {
     for (const a of items || []) {
       if (!isImage(a) || urlsRef.current[a.id]) continue;
+      if (a.file) {
+        keepUrl(a.id, URL.createObjectURL(a.file));
+        continue;
+      }
       urlsRef.current[a.id] = 'loading';
       api
         .getTaskAttachmentBlob(taskId, a.id)
-        .then((blob) => {
-          urlsRef.current[a.id] = URL.createObjectURL(blob);
-          setUrls({ ...urlsRef.current });
-        })
+        .then((blob) => keepUrl(a.id, URL.createObjectURL(blob)))
         .catch(() => delete urlsRef.current[a.id]);
     }
   }, [items, taskId]);
@@ -73,21 +161,28 @@ export default function TaskAttachments({ taskId }) {
     []
   );
 
-  async function upload(files) {
+  async function add(files) {
     setError('');
+    const ok = [];
     for (const file of files) {
       if (file.size > MAX_BYTES) {
         setError(`"${file.name}" גדול מדי (${formatSize(file.size)}) — עד ${formatSize(MAX_BYTES)} לקובץ`);
-        continue;
+      } else {
+        ok.push(file);
       }
+    }
+    if (isNew) {
+      const now = new Date().toISOString();
+      onPendingChange?.((prev) => [...(prev || []), ...ok.map((file) => ({ key: crypto.randomUUID(), file, addedAt: now }))]);
+      return;
+    }
+    for (const file of ok) {
       setUploading((n) => n + 1);
       try {
-        const saved = await api.addTaskAttachment(taskId, file);
-        if (isImage(saved)) {
-          urlsRef.current[saved.id] = URL.createObjectURL(file);
-          setUrls({ ...urlsRef.current });
-        }
-        setItems((prev) => [...(prev || []), saved]);
+        const a = await uploadAttachment(taskId, file);
+        if (isImage(a)) keepUrl(a.id, URL.createObjectURL(file));
+        setSaved((prev) => [...(prev || []), a]);
+        onChange?.();
       } catch (err) {
         setError(`"${file.name}" לא צורף: ${err.message}`);
       } finally {
@@ -97,31 +192,26 @@ export default function TaskAttachments({ taskId }) {
   }
 
   // Paste anywhere in the task window — but text pasted into a field stays text.
+  const addRef = useRef(add);
+  addRef.current = add;
   useEffect(() => {
     const form = rootRef.current?.closest('[data-task-form]') || document;
     function onPaste(e) {
       const files = [...(e.clipboardData?.files || [])];
       if (!files.length) return;
       e.preventDefault();
-      upload(files.map(nameForPasted));
+      addRef.current(files.map(nameForPasted));
     }
     form.addEventListener('paste', onPaste);
     return () => form.removeEventListener('paste', onPaste);
-  }, [taskId]);
-
-  useEffect(() => {
-    if (!preview) return;
-    const onKey = (e) => e.key === 'Escape' && (e.stopPropagation(), setPreview(null));
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [preview]);
+  }, []);
 
   async function open(a) {
     if (isImage(a) && urls[a.id] && urls[a.id] !== 'loading') return setPreview(a);
     // Opened before the fetch so the browser doesn't treat it as a popup.
     const win = window.open('', '_blank');
     try {
-      const blob = await api.getTaskAttachmentBlob(taskId, a.id);
+      const blob = a.file || (await api.getTaskAttachmentBlob(taskId, a.id));
       const url = URL.createObjectURL(blob);
       const viewable = isImage(a) || a.mime_type === 'application/pdf';
       if (viewable && win) {
@@ -141,11 +231,17 @@ export default function TaskAttachments({ taskId }) {
   }
 
   async function remove(a) {
+    if (isNew) {
+      onPendingChange?.((prev) => prev.filter((p) => p.key !== a.id));
+      if (preview?.id === a.id) setPreview(null);
+      return;
+    }
     if (!window.confirm(`למחוק את "${a.file_name}"?`)) return;
     try {
       await api.deleteTaskAttachment(taskId, a.id);
-      setItems((prev) => prev.filter((x) => x.id !== a.id));
+      setSaved((prev) => prev.filter((x) => x.id !== a.id));
       if (preview?.id === a.id) setPreview(null);
+      onChange?.();
     } catch (err) {
       setError(err.message || 'שגיאה במחיקת הקובץ');
     }
@@ -167,7 +263,7 @@ export default function TaskAttachments({ taskId }) {
         if (!e.dataTransfer.files.length) return;
         e.preventDefault();
         setDragging(false);
-        upload([...e.dataTransfer.files]);
+        add([...e.dataTransfer.files]);
       }}
       className={`rounded ${dragging ? 'ring-2 ring-emerald-500 bg-emerald-50' : ''}`}
     >
@@ -180,7 +276,7 @@ export default function TaskAttachments({ taskId }) {
               <button
                 type="button"
                 onClick={() => open(a)}
-                title={`${a.file_name} · ${a.author_name || '—'} · ${formatTime(a.created_at)}`}
+                title={a.file ? a.file_name : `${a.file_name} · ${a.author_name || '—'} · ${formatTime(a.created_at)}`}
                 className="block w-24 h-24 border rounded overflow-hidden bg-gray-100"
               >
                 {urls[a.id] && urls[a.id] !== 'loading' ? (
@@ -211,7 +307,8 @@ export default function TaskAttachments({ taskId }) {
                 {a.file_name}
               </button>
               <span className="text-xs text-gray-400 whitespace-nowrap">
-                {formatSize(a.size_bytes)} · {a.author_name || '—'} · {formatTime(a.created_at)}
+                {formatSize(a.size_bytes)}
+                {!a.file && ` · ${a.author_name || '—'} · ${formatTime(a.created_at)}`}
               </span>
               <button type="button" onClick={() => remove(a)} title="מחק" className="ms-auto text-red-600 text-xs">
                 ✕
@@ -222,7 +319,10 @@ export default function TaskAttachments({ taskId }) {
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-400">אפשר גם לגרור לכאן או להדביק (Ctrl+V) צילום מסך. עד 4MB לקובץ.</p>
+        <p className="text-xs text-gray-400">
+          אפשר גם לגרור לכאן או להדביק (Ctrl+V) צילום מסך. עד 4MB לקובץ.
+          {isNew && items.length > 0 && ' הקבצים יעלו עם יצירת המשימה.'}
+        </p>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -237,7 +337,7 @@ export default function TaskAttachments({ taskId }) {
           multiple
           className="hidden"
           onChange={(e) => {
-            upload([...e.target.files]);
+            add([...e.target.files]);
             e.target.value = '';
           }}
         />
@@ -245,26 +345,7 @@ export default function TaskAttachments({ taskId }) {
       {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
 
       {preview && urls[preview.id] && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4"
-          onClick={() => setPreview(null)}
-        >
-          <img
-            src={urls[preview.id]}
-            alt={preview.file_name}
-            className="max-w-full max-h-[85vh] object-contain rounded shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div className="mt-3 flex items-center gap-3 text-white text-sm" onClick={(e) => e.stopPropagation()}>
-            <span className="truncate max-w-[60vw]">{preview.file_name}</span>
-            <a href={urls[preview.id]} download={preview.file_name} className="underline">
-              הורד
-            </a>
-            <button type="button" onClick={() => setPreview(null)} className="underline">
-              סגור
-            </button>
-          </div>
-        </div>
+        <ImageLightbox url={urls[preview.id]} name={preview.file_name} onClose={() => setPreview(null)} />
       )}
     </div>
   );

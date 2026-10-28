@@ -8,9 +8,14 @@ import { actorFor, recordAction, describeFieldChange, userNames } from '../servi
 import { listNotes, addNote } from '../services/taskNotes.js';
 import {
   MAX_BYTES,
+  MAX_THUMB_BYTES,
+  IMAGE_TYPE_SQL,
+  ensureTable as ensureAttachmentsTable,
   listAttachments,
   addAttachment,
   getAttachment,
+  setThumb,
+  getThumb,
   deleteAttachment,
 } from '../services/taskAttachments.js';
 import { PRIORITY_LABELS } from '../labels.js';
@@ -93,8 +98,12 @@ router.get('/', async (req, res) => {
     where += ` AND ${dateCol} <= $${params.length}::date`;
   }
 
+  // thumb_id: the task's first image, for the table's "תמונה" column (services/taskAttachments.js)
+  await ensureAttachmentsTable();
   const { rows } = await pool.query(
     `SELECT t.*,
+       (SELECT a.id FROM task_attachments a WHERE a.task_id = t.id AND a.mime_type ~* ${IMAGE_TYPE_SQL}
+        ORDER BY a.created_at LIMIT 1) AS thumb_id,
        COALESCE(
          json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email))
          FILTER (WHERE u.id IS NOT NULL), '[]'
@@ -196,6 +205,32 @@ router.get('/:id/attachments/:attachmentId', async (req, res) => {
     'Cache-Control': 'private, max-age=86400',
   });
   res.send(file.data);
+});
+
+// The image's small copy, made and sent by the browser right after the upload (JPEG, raw body).
+router.put(
+  '/:id/attachments/:attachmentId/thumb',
+  express.raw({ type: 'application/octet-stream', limit: MAX_THUMB_BYTES }),
+  async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'empty' });
+    const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (!(await setThumb(rows[0].id, req.params.attachmentId, req.body))) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  }
+);
+
+router.get('/:id/attachments/:attachmentId/thumb', async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  const thumb = await getThumb(rows[0].id, req.params.attachmentId);
+  if (!thumb) return res.status(404).json({ error: 'Not found' });
+  res.set({
+    'Content-Type': thumb.mimeType,
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'private, max-age=86400',
+  });
+  res.send(thumb.data);
 });
 
 router.delete('/:id/attachments/:attachmentId', async (req, res) => {

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext.jsx';
 import AssigneePicker from '../components/AssigneePicker.jsx';
 import { sendKanbanUpdate } from '../components/KanbanSendUpdate.jsx';
 import TaskFormModal from '../components/TaskFormModal.jsx';
+import TaskThumb from '../components/TaskThumb.jsx';
 import { formatDate, isOverdue } from '../utils.js';
 import PageFrame from '../components/PageFrame.jsx';
 import TaskFilters from '../components/TaskFilters.jsx';
@@ -56,16 +57,19 @@ export default function TableView() {
     return (STATUS_COLOR_OPTIONS[color] || STATUS_COLOR_OPTIONS.gray).row;
   }
 
+  // The saved task as the server returns it has no thumb_id (only the list adds it); keep the row's.
   function handleSaved(updated) {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? { thumb_id: t.thumb_id, ...updated } : t)));
   }
 
   function handleDeleted(taskId) {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   }
 
+  const UNSORTABLE = ['image', 'assignees'];
   const columns = [
     ['title', 'המשימה'],
+    ['image', 'תמונה'],
     ['priority', 'עדיפות'],
     ['due_date', 'תאריך יעד'],
     ['status', 'סטטוס'],
@@ -81,13 +85,16 @@ export default function TableView() {
       <div className="sm:hidden space-y-2">
         {tasks.map((t) => (
           <div key={t.id} className={`border rounded-lg p-3 space-y-1.5 ${rowColor(t) || 'bg-white'}`}>
-            <button
-              type="button"
-              onClick={() => setEditingTask(t)}
-              className="block w-full text-right font-medium text-emerald-700 break-words"
-            >
-              {t.title}
-            </button>
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingTask(t)}
+                className="block flex-1 min-w-0 text-right font-medium text-emerald-700 break-words"
+              >
+                {t.title}
+              </button>
+              <TaskThumb task={t} size="w-10 h-10" />
+            </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
               <span>{statusLabel(t.status)}</span>
               <span>עדיפות: {PRIORITY_LABELS[t.priority]}</span>
@@ -115,8 +122,8 @@ export default function TableView() {
             {columns.map(([key, label]) => (
               <th
                 key={key}
-                onClick={() => key !== 'assignees' && toggleSort(key)}
-                className={`p-2 border-b text-right select-none ${key !== 'assignees' ? 'cursor-pointer' : ''}`}
+                onClick={() => !UNSORTABLE.includes(key) && toggleSort(key)}
+                className={`p-2 border-b text-right select-none ${!UNSORTABLE.includes(key) ? 'cursor-pointer' : ''}`}
               >
                 {label} {sort.col === key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}
               </th>
@@ -131,6 +138,9 @@ export default function TableView() {
                 onClick={() => setEditingTask(t)}
               >
                 {t.title}
+              </td>
+              <td className="p-1">
+                <TaskThumb task={t} />
               </td>
               <td className="p-2">{PRIORITY_LABELS[t.priority]}</td>
               <td className={`p-2 ${isOverdue(t, statuses) ? 'text-red-700 font-semibold' : ''}`}>

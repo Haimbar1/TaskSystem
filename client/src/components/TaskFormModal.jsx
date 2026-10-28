@@ -85,11 +85,11 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     return payload;
   }
 
-  // "שלח עדכון בוואטסאפ" next to "שמור" (Haim, 2026-10-26: a checkbox instead of a separate button,
-  // off by default): saving sends no WhatsApp unless it's ticked — then the changes since the last
-  // update go out once the save is done (server/src/services/notifications.js), and
+  // "שלח עדכון בוואטסאפ" next to "שמור" (Haim, 2026-10-26: a checkbox instead of a separate button;
+  // on by default since 2026-10-28): when ticked, the changes since the last update go out once the
+  // save is done; untick it to save without a WhatsApp (server/src/services/notifications.js), and
   // WhatsAppSentToast says who got them.
-  const [sendUpdate, setSendUpdate] = useState(false);
+  const [sendUpdate, setSendUpdate] = useState(true);
   const [pendingUpdate, setPendingUpdate] = useState(null); // { changes, recipients }
   useEffect(() => {
     if (isEdit) api.getPendingUpdate(task.id).then(setPendingUpdate).catch(() => setPendingUpdate(null));

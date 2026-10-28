@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 
-// The Kanban boards' "שלח וואטסאפ על כל שינוי" (Haim, 2026-10-26): off by default; when ticked,
+// The Kanban boards' "שלח וואטסאפ על כל שינוי" (Haim, 2026-10-26; on by default since 2026-10-28): when ticked,
 // every card moved also sends the WhatsApp update for that task (like the task window's
 // "שלח עדכון בוואטסאפ"). Remembered on this device, shared by both boards.
 const KEY = 'tasks.kanbanSendUpdate';
@@ -9,16 +9,16 @@ const KEY = 'tasks.kanbanSendUpdate';
 export function useKanbanSendUpdate() {
   const [on, setOn] = useState(() => {
     try {
-      return localStorage.getItem(KEY) === '1';
+      return localStorage.getItem(KEY) !== '0';
     } catch {
-      return false;
+      return true;
     }
   });
   function change(value) {
     setOn(value);
     try {
-      if (value) localStorage.setItem(KEY, '1');
-      else localStorage.removeItem(KEY);
+      if (value) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, '0');
     } catch {
       // Storage unavailable (e.g. blocked in the iframe) — it's just not remembered.
     }

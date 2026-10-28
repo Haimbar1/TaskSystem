@@ -5,6 +5,7 @@ import { PRIORITY_LABELS, STATUS_COLOR_OPTIONS } from '../constants.js';
 import { toDateInputValue } from '../utils.js';
 import { getActingUserId, setActingUserId } from '../actingUser.js';
 import TaskNotes from './TaskNotes.jsx';
+import TaskAttachments from './TaskAttachments.jsx';
 import AssigneePicker from './AssigneePicker.jsx';
 import { isDoneLine, isItemLine, isLegacyList, hasItems, lineText, toggleLine, toggleItems, typedMarks } from '../descriptionLines.js';
 
@@ -171,6 +172,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <form
+        data-task-form
         onSubmit={handleSubmit}
         className="bg-white rounded p-4 w-full max-w-2xl lg:max-w-5xl space-y-3 max-h-[92vh] overflow-y-auto"
       >
@@ -376,9 +378,12 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
         </div>
 
         {isEdit ? (
-          <TaskNotes taskId={task.id} onDraftChange={setHasUnaddedNote} />
+          <>
+            <TaskNotes taskId={task.id} onDraftChange={setHasUnaddedNote} />
+            <TaskAttachments taskId={task.id} />
+          </>
         ) : (
-          <p className="text-xs text-gray-400">הערות ביצוע אפשר להוסיף אחרי יצירת המשימה.</p>
+          <p className="text-xs text-gray-400">הערות ביצוע וקבצים מצורפים אפשר להוסיף אחרי יצירת המשימה.</p>
         )}
 
         {error && <p className="text-red-600 text-sm">{error}</p>}

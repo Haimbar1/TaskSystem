@@ -43,6 +43,27 @@ export const api = {
   deleteTask: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   getTaskNotes: (id) => request(`/api/tasks/${id}/notes`),
   addTaskNote: (id, body) => request(`/api/tasks/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
+  getTaskAttachments: (id) => request(`/api/tasks/${id}/attachments`),
+  // The file goes as the raw body (see server/src/routes/taskRoutes.js), its name/type in headers.
+  addTaskAttachment: (id, file) =>
+    request(`/api/tasks/${id}/attachments`, {
+      method: 'POST',
+      body: file,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-File-Name': encodeURIComponent(file.name || 'קובץ'),
+        'X-File-Type': file.type || 'application/octet-stream',
+      },
+    }),
+  deleteTaskAttachment: (id, attachmentId) =>
+    request(`/api/tasks/${id}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  // The file's contents as a Blob — fetched with the login cookie, so it works for <img> and links
+  // through URL.createObjectURL (inside Monday too, where a plain <img src> to the API may lack it).
+  getTaskAttachmentBlob: async (id, attachmentId) => {
+    const res = await fetch(`${API_URL}/api/tasks/${id}/attachments/${attachmentId}`, { credentials: 'include' });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.blob();
+  },
   getUsers: () => request('/api/users'),
   inviteUser: (data) => request('/api/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

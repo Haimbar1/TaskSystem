@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { pool } from '../db.js';
 import { logActivity, previewPendingUpdate, sendPendingUpdate } from '../services/notifications.js';
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
@@ -6,6 +6,13 @@ import { takePendingTask } from './openTaskRoutes.js';
 import { getStatuses, finalKeys } from '../services/taskStatuses.js';
 import { actorFor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
 import { listNotes, addNote } from '../services/taskNotes.js';
+import {
+  MAX_BYTES,
+  listAttachments,
+  addAttachment,
+  getAttachment,
+  deleteAttachment,
+} from '../services/taskAttachments.js';
 import { PRIORITY_LABELS } from '../labels.js';
 
 const router = Router();
@@ -135,6 +142,73 @@ router.post('/:id/notes', async (req, res) => {
   const note = await addNote(task.id, req.actor, body);
   await recordAction(req, { action: 'note_added', task, details: body.length > 80 ? `${body.slice(0, 80)}…` : body });
   res.status(201).json(note);
+});
+
+// The task's files ("קבצים מצורפים"), oldest first, without their contents; see services/taskAttachments.js.
+router.get('/:id/attachments', async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(await listAttachments(rows[0].id));
+});
+
+// The file itself is the raw request body (always sent as application/octet-stream, so express.json
+// never touches it — even a .json file); its name and type come in X-File-Name / X-File-Type.
+router.post(
+  '/:id/attachments',
+  express.raw({ type: 'application/octet-stream', limit: MAX_BYTES }),
+  async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ error: 'הקובץ ריק' });
+    let fileName = 'קובץ';
+    try {
+      fileName = decodeURIComponent(req.get('x-file-name') || '').trim().slice(0, 255) || fileName;
+    } catch {}
+    const mimeType = (req.get('x-file-type') || '').trim().slice(0, 120) || 'application/octet-stream';
+    const { rows } = await pool.query('SELECT id, title FROM tasks WHERE id = $1 AND tenant_id = $2', [
+      req.params.id,
+      req.tenantId,
+    ]);
+    const task = rows[0];
+    if (!task) return res.status(404).json({ error: 'Not found' });
+    req.actor = await actorFor(req);
+    if (req.actor.viaMonday && !req.actor.userId) {
+      return res.status(400).json({ error: 'יש לבחור למעלה "מי את/ה?" כדי שיהיה ידוע מי צירף את הקובץ' });
+    }
+    const attachment = await addAttachment(task.id, req.actor, { fileName, mimeType, data: req.body });
+    await recordAction(req, { action: 'attachment_added', task, details: fileName });
+    res.status(201).json(attachment);
+  }
+);
+
+// Images and PDFs are served inline (thumbnails, opening in a tab); anything else only as a download,
+// and nothing here may run as a page on the API's own site (an uploaded .html or .svg).
+const INLINE_TYPES = /^(image\/(png|jpe?g|gif|webp|bmp|avif)|application\/pdf)$/i;
+router.get('/:id/attachments/:attachmentId', async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM tasks WHERE id = $1 AND tenant_id = $2', [req.params.id, req.tenantId]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  const file = await getAttachment(rows[0].id, req.params.attachmentId);
+  if (!file) return res.status(404).json({ error: 'Not found' });
+  const inline = INLINE_TYPES.test(file.mime_type);
+  res.set({
+    'Content-Type': inline ? file.mime_type : 'application/octet-stream',
+    'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+    'Cache-Control': 'private, max-age=86400',
+  });
+  res.send(file.data);
+});
+
+router.delete('/:id/attachments/:attachmentId', async (req, res) => {
+  const { rows } = await pool.query('SELECT id, title FROM tasks WHERE id = $1 AND tenant_id = $2', [
+    req.params.id,
+    req.tenantId,
+  ]);
+  const task = rows[0];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  const removed = await deleteAttachment(task.id, req.params.attachmentId);
+  if (!removed) return res.status(404).json({ error: 'Not found' });
+  await recordAction(req, { action: 'attachment_deleted', task, details: removed.file_name });
+  res.status(204).end();
 });
 
 router.post('/', async (req, res) => {

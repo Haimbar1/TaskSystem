@@ -8,6 +8,8 @@ const ACTION = {
   task_updated: 'משימה עודכנה',
   task_deleted: 'משימה נמחקה',
   note_added: 'הערה נוספה',
+  attachment_added: 'קובץ צורף',
+  attachment_deleted: 'קובץ נמחק',
   statuses_changed: 'סטטוסים עודכנו',
   settings_changed: 'הגדרות עודכנו',
   user_added: 'משתמש נוסף',

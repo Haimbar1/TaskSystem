@@ -86,6 +86,7 @@ export default function KanbanAssigneeView() {
                   <KanbanCard
                     key={t.id}
                     task={t}
+                    showStatus
                     saving={savingIds.includes(t.id)}
                     sending={sendUpdate}
                     onOpen={() => setEditingTask(t)}

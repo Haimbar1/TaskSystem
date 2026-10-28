@@ -191,19 +191,65 @@ export default function TaskAttachments({ taskId, pending, onPendingChange, onCh
     }
   }
 
-  // Paste anywhere in the task window — but text pasted into a field stays text.
+  // Paste or drop files anywhere in the task window — but text pasted into a field stays text.
+  // A file dropped anywhere else on the page is ignored, instead of the browser opening it in place
+  // of the system.
   const addRef = useRef(add);
   addRef.current = add;
   useEffect(() => {
     const form = rootRef.current?.closest('[data-task-form]') || document;
+    const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+    let depth = 0; // dragenter/leave fire for every child the drag passes over
     function onPaste(e) {
       const files = [...(e.clipboardData?.files || [])];
       if (!files.length) return;
       e.preventDefault();
       addRef.current(files.map(nameForPasted));
     }
+    function onEnter(e) {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setDragging(true);
+    }
+    function onLeave(e) {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setDragging(false);
+    }
+    function onOver(e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+    function onDrop(e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      if (e.dataTransfer.files.length) addRef.current([...e.dataTransfer.files]);
+    }
+    function blockOutside(e) {
+      if (hasFiles(e) && !form.contains?.(e.target)) {
+        e.preventDefault();
+        if (e.type === 'dragover') e.dataTransfer.dropEffect = 'none';
+      }
+    }
     form.addEventListener('paste', onPaste);
-    return () => form.removeEventListener('paste', onPaste);
+    form.addEventListener('dragenter', onEnter);
+    form.addEventListener('dragleave', onLeave);
+    form.addEventListener('dragover', onOver);
+    form.addEventListener('drop', onDrop);
+    window.addEventListener('dragover', blockOutside);
+    window.addEventListener('drop', blockOutside);
+    return () => {
+      form.removeEventListener('paste', onPaste);
+      form.removeEventListener('dragenter', onEnter);
+      form.removeEventListener('dragleave', onLeave);
+      form.removeEventListener('dragover', onOver);
+      form.removeEventListener('drop', onDrop);
+      window.removeEventListener('dragover', blockOutside);
+      window.removeEventListener('drop', blockOutside);
+    };
   }, []);
 
   async function open(a) {
@@ -251,22 +297,18 @@ export default function TaskAttachments({ taskId, pending, onPendingChange, onCh
   const others = (items || []).filter((a) => !isImage(a));
 
   return (
-    <div
-      ref={rootRef}
-      onDragOver={(e) => {
-        if (![...e.dataTransfer.types].includes('Files')) return;
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setDragging(false)}
-      onDrop={(e) => {
-        if (!e.dataTransfer.files.length) return;
-        e.preventDefault();
-        setDragging(false);
-        add([...e.dataTransfer.files]);
-      }}
-      className={`rounded ${dragging ? 'ring-2 ring-emerald-500 bg-emerald-50' : ''}`}
-    >
+    <div ref={rootRef}>
+      {/* While files are dragged over the task window: it all is the drop zone. pointer-events-none
+          so the drag events keep reaching the form underneath. */}
+      {dragging && (
+        <div className="fixed inset-0 z-[90] pointer-events-none flex items-center justify-center bg-emerald-900/30">
+          <div className="rounded-2xl border-4 border-dashed border-emerald-400 bg-white/95 px-8 py-6 text-center shadow-xl">
+            <div className="text-3xl mb-1">📎</div>
+            <div className="font-bold text-emerald-800">שחררו כאן כדי לצרף למשימה</div>
+            <div className="text-xs text-gray-500 mt-1">תמונות, PDF או כל קובץ — עד 4MB לקובץ</div>
+          </div>
+        </div>
+      )}
       <label className="block text-sm mb-1">קבצים מצורפים</label>
 
       {images.length > 0 && (
@@ -320,7 +362,7 @@ export default function TaskAttachments({ taskId, pending, onPendingChange, onCh
 
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-gray-400">
-          אפשר גם לגרור לכאן או להדביק (Ctrl+V) צילום מסך. עד 4MB לקובץ.
+          אפשר גם לגרור קבצים לכל מקום בחלון המשימה, או להדביק (Ctrl+V) צילום מסך. עד 4MB לקובץ.
           {isNew && items.length > 0 && ' הקבצים יעלו עם יצירת המשימה.'}
         </p>
         <button

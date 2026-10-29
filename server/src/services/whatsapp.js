@@ -70,7 +70,7 @@ export async function wabaOfPhone({ accessToken, phoneNumberId, wabaId }) {
 
 // The WABA's approved templates the task system can send: only ones whose variables are all in the
 // body (a header or button variable, or a media header, needs values it can't fill). Returns
-// { templates: [{ name, language, category, body, header, footer, buttons }] } or { error } (Meta's message).
+// { templates: [{ id, name, language, category, body, header, footer, buttons }] } or { error } (Meta's message).
 export async function listApprovedTemplates({ accessToken, wabaId }) {
   if (!accessToken || !wabaId) return { error: 'חסרים Access Token או WABA ID' };
   try {
@@ -91,6 +91,7 @@ export async function listApprovedTemplates({ accessToken, wabaId }) {
       if (buttons.some((b) => /\{\{/.test(b.url || '') || b.type === 'COPY_CODE' || b.type === 'OTP')) continue;
       // header / footer / buttons only for the settings screen's preview — the send fills the body alone
       templates.push({
+        id: t.id,
         name: t.name,
         language: t.language,
         category: t.category,

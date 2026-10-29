@@ -17,8 +17,6 @@ import {
   DEFAULT_TEMPLATES,
   getTemplateSettings,
   setTemplateSettings,
-  getTemplateTitles,
-  setTemplateTitles,
 } from '../services/whatsappTemplates.js';
 import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
@@ -382,8 +380,7 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
     fields: Object.fromEntries(Object.entries(TEMPLATE_FIELDS).map(([key, f]) => [key, f.label])),
     defaults: DEFAULT_TEMPLATES,
     settings: await getTemplateSettings(req.tenantId),
-    titles: await getTemplateTitles(req.tenantId),
-    // the names given on the WhatsApp system's templates screen; a name typed here wins
+    // the names given on the WhatsApp system's templates screen
     system_titles: systemTitles,
     approved: approved.templates || [],
     approved_error: approved.error || '',
@@ -397,7 +394,6 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
 router.put('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin, async (req, res) => {
   const error = await setTemplateSettings(req.tenantId, req.body?.settings);
   if (error) return res.status(400).json({ error });
-  if (req.body?.titles) await setTemplateTitles(req.tenantId, req.body.titles);
   const settings = await getTemplateSettings(req.tenantId);
   await recordAction(req, {
     action: 'settings_changed',

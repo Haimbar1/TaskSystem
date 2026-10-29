@@ -212,7 +212,6 @@ export default function WhatsAppTemplatesSettings() {
             </select>
             {t.name && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                {titleOf(t.name) && <span className="font-semibold text-sm">{titleOf(t.name)}</span>}
                 <span>
                   <span className="text-gray-500">שם התבנית: </span>
                   <span dir="ltr" className="font-mono font-medium break-all">{t.name}</span>

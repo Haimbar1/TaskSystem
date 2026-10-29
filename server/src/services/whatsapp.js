@@ -70,7 +70,7 @@ export async function wabaOfPhone({ accessToken, phoneNumberId, wabaId }) {
 
 // The WABA's approved templates the task system can send: only ones whose variables are all in the
 // body (a header or button variable, or a media header, needs values it can't fill). Returns
-// { templates: [{ name, language, category, body }] } or { error } (Meta's message).
+// { templates: [{ name, language, category, body, header, footer, buttons }] } or { error } (Meta's message).
 export async function listApprovedTemplates({ accessToken, wabaId }) {
   if (!accessToken || !wabaId) return { error: 'חסרים Access Token או WABA ID' };
   try {
@@ -89,7 +89,16 @@ export async function listApprovedTemplates({ accessToken, wabaId }) {
       const buttons = components.find((c) => c.type === 'BUTTONS')?.buttons || [];
       if (header && (header.format !== 'TEXT' || /\{\{/.test(header.text || ''))) continue;
       if (buttons.some((b) => /\{\{/.test(b.url || '') || b.type === 'COPY_CODE' || b.type === 'OTP')) continue;
-      templates.push({ name: t.name, language: t.language, category: t.category, body });
+      // header / footer / buttons only for the settings screen's preview — the send fills the body alone
+      templates.push({
+        name: t.name,
+        language: t.language,
+        category: t.category,
+        body,
+        header: header?.text || '',
+        footer: components.find((c) => c.type === 'FOOTER')?.text || '',
+        buttons: buttons.map((b) => b.text).filter(Boolean),
+      });
     }
     templates.sort((a, b) => a.name.localeCompare(b.name));
     return { templates };

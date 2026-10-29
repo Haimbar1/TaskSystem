@@ -8,6 +8,13 @@ import { api } from '../api.js';
 const sameTemplate = (a, b) =>
   a.name === b.name && a.language === b.language && a.body === b.body && a.params.join() === b.params.join();
 
+// Meta's template category: a marketing one costs more per message and WhatsApp may hold it back
+const CATEGORIES = {
+  UTILITY: { label: 'שירותי', className: 'bg-emerald-100 text-emerald-800' },
+  MARKETING: { label: 'שיווקי', className: 'bg-amber-100 text-amber-800' },
+  AUTHENTICATION: { label: 'אימות', className: 'bg-sky-100 text-sky-800' },
+};
+
 function variableCount(body) {
   let max = 0;
   for (const m of String(body || '').matchAll(/\{\{(\d+)\}\}/g)) max = Math.max(max, Number(m[1]));
@@ -149,7 +156,9 @@ export default function WhatsAppTemplatesSettings() {
         const def = data.defaults[e.key];
         const isDefault = sameTemplate(t, def);
         const isCustom = custom[e.key];
-        const inApproved = data.approved.some((a) => a.name === t.name && a.language === t.language);
+        const meta = data.approved.find((a) => a.name === t.name && a.language === t.language);
+        const inApproved = Boolean(meta);
+        const category = meta && (CATEGORIES[meta.category] || { label: meta.category, className: 'bg-gray-100 text-gray-700' });
         const preview = t.body.replace(/\{\{(\d+)\}\}/g, (m, n) => {
           const field = t.params[Number(n) - 1];
           return field ? `[${data.fields[field]}]` : m;
@@ -186,12 +195,38 @@ export default function WhatsAppTemplatesSettings() {
               )}
               {data.approved.map((a) => (
                 <option key={`${a.name}|${a.language}`} value={`${a.name}|${a.language}`}>
-                  {a.name} · {a.language}
+                  {a.name} · {a.language} · {CATEGORIES[a.category]?.label || a.category}
                   {a.name === def.name ? ' (ברירת המחדל)' : ''}
                 </option>
               ))}
               <option value="__custom__">✎ הקלדת שם תבנית…</option>
             </select>
+            {t.name && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span>
+                  <span className="text-gray-500">שם התבנית: </span>
+                  <span dir="ltr" className="font-mono font-medium break-all">{t.name}</span>
+                </span>
+                <span>
+                  <span className="text-gray-500">שפה: </span>
+                  <span dir="ltr">{t.language}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="text-gray-500">סוג:</span>
+                  {category ? (
+                    <span className={`px-2 py-0.5 rounded-full font-medium ${category.className}`}>{category.label}</span>
+                  ) : (
+                    <span className="text-gray-400">לא ידוע (התבנית לא נמצאה ב-WABA)</span>
+                  )}
+                </span>
+              </div>
+            )}
+            {meta?.category === 'MARKETING' && (
+              <p className="text-xs text-amber-700">
+                תבנית שיווקית — יקרה יותר להודעה, ו-WhatsApp עלול לעכב או לא למסור אותה לנמענים. להודעות משימה עדיף תבנית
+                שירותית.
+              </p>
+            )}
             {isCustom && (
               <div className="space-y-2 border rounded p-2 bg-gray-50">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -263,7 +298,28 @@ export default function WhatsAppTemplatesSettings() {
                 ))}
               </div>
             )}
-            {preview && <p className="whitespace-pre-line text-gray-600 bg-gray-50 border rounded p-2">{preview}</p>}
+            {(preview || meta?.header) && (
+              <div className="rounded-lg bg-[#efeae2] p-3">
+                <span className="block text-xs text-gray-500 mb-1">תצוגה של ההודעה שתישלח</span>
+                <div className="max-w-sm rounded-lg bg-white shadow-sm overflow-hidden">
+                  <div className="p-2 space-y-1">
+                    {meta?.header && <p className="font-semibold">{meta.header}</p>}
+                    {preview && (
+                      <p className="whitespace-pre-line text-gray-800">
+                        {/* *text* is bold in WhatsApp */}
+                        {preview.split(/\*([^*\n]+)\*/).map((part, i) => (i % 2 ? <b key={i}>{part}</b> : part))}
+                      </p>
+                    )}
+                    {meta?.footer && <p className="text-xs text-gray-500">{meta.footer}</p>}
+                  </div>
+                  {meta?.buttons?.map((b) => (
+                    <div key={b} className="border-t text-center text-sky-600 py-1.5">
+                      {b}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

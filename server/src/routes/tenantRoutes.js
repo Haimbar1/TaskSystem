@@ -4,7 +4,11 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireTenant } from '../middleware/tenant.js';
 import { getEmbedToken, rotateEmbedToken, clearEmbedToken, isEmbedUser } from '../embed.js';
 import { whatsappCredentials, writeToVault, forgetVaultCache } from '../tenantSecrets.js';
-import { listWhatsAppSystemAccounts, moveAccountToVault } from '../services/whatsappSystemAccounts.js';
+import {
+  listWhatsAppSystemAccounts,
+  moveAccountToVault,
+  listWhatsAppTemplateNames,
+} from '../services/whatsappSystemAccounts.js';
 import { listMessages, deleteMessage, statusForwardUrl } from '../services/whatsappLog.js';
 import { listPhoneNumbers, listApprovedTemplates, wabaOfPhone } from '../services/whatsapp.js';
 import {
@@ -353,7 +357,11 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
     wabaId: values.whatsapp_waba_id,
   });
   const templatesWaba = phoneWaba || values.whatsapp_waba_id;
-  const approved = await listApprovedTemplates({ accessToken: values.whatsapp_access_token, wabaId: templatesWaba });
+  const { rows: tenantRows } = await pool.query('SELECT * FROM tenants WHERE id = $1', [req.tenantId]);
+  const [approved, systemTitles] = await Promise.all([
+    listApprovedTemplates({ accessToken: values.whatsapp_access_token, wabaId: templatesWaba }),
+    listWhatsAppTemplateNames(Number(tenantRows[0]?.portal_tenant_id) || null),
+  ]);
   // Meta's "does not exist / missing permissions" on the WABA = the token can't see this WABA. Say
   // so in plain words, with where each value comes from (the token and WABA ID may come from
   // different places — see tenantSecrets.js).
@@ -375,6 +383,8 @@ router.get('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
     defaults: DEFAULT_TEMPLATES,
     settings: await getTemplateSettings(req.tenantId),
     titles: await getTemplateTitles(req.tenantId),
+    // the names given on the WhatsApp system's templates screen; a name typed here wins
+    system_titles: systemTitles,
     approved: approved.templates || [],
     approved_error: approved.error || '',
     templates_waba_id: templatesWaba || '',

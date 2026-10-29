@@ -34,6 +34,19 @@ export async function listWhatsAppSystemAccounts() {
   }
 }
 
+// The Hebrew names given to templates on the WhatsApp system's "תבניות רשומות בחשבון" screen:
+// { [template name]: name }, the given portal business's own names first. {} when unreachable.
+export async function listWhatsAppTemplateNames(portalTenantId) {
+  try {
+    const { ok, data } = await call({ typ: 'wa-template-names', tenant: portalTenantId || null });
+    if (!ok) throw new Error(data?.error || 'failed');
+    return data.names && typeof data.names === 'object' ? data.names : {};
+  } catch (err) {
+    console.warn('[whatsapp-system] template names failed:', err?.message);
+    return {};
+  }
+}
+
 // Writes the account with that number into the portal vault of the given portal business.
 // Returns { ok, error }.
 export async function moveAccountToVault(phoneNumberId, portalTenantId, byEmail) {

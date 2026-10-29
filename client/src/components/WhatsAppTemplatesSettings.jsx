@@ -54,6 +54,14 @@ export default function WhatsAppTemplatesSettings() {
 
   if (!data) return message ? <p className="text-sm text-red-600 mt-5">{message}</p> : null;
 
+  // The name the WhatsApp system's templates screen gives it, else a Hebrew header (as that screen does)
+  function systemTitle(name) {
+    const header = data.approved.find((a) => a.name === name && /[֐-׿]/.test(a.header || ''))?.header;
+    return data.system_titles?.[name] || header || '';
+  }
+  // what a template is called on this screen: a name typed here wins
+  const titleOf = (name) => titles[name] || systemTitle(name);
+
   // Typed-in template: its text (optional) sets the variables; without it, their number does.
   function editCustom(eventKey, patch) {
     const t = { ...draft[eventKey], ...patch };
@@ -192,7 +200,7 @@ export default function WhatsAppTemplatesSettings() {
             >
               {!data.approved.some((a) => a.name === def.name && a.language === def.language) && (
                 <option value={`${def.name}|${def.language}`}>
-                  {titles[def.name] ? `${titles[def.name]} — ` : ''}
+                  {titleOf(def.name) ? `${titleOf(def.name)} — ` : ''}
                   {def.name} (ברירת המחדל)
                 </option>
               )}
@@ -201,7 +209,7 @@ export default function WhatsAppTemplatesSettings() {
               )}
               {data.approved.map((a) => (
                 <option key={`${a.name}|${a.language}`} value={`${a.name}|${a.language}`}>
-                  {titles[a.name] ? `${titles[a.name]} — ` : ''}
+                  {titleOf(a.name) ? `${titleOf(a.name)} — ` : ''}
                   {a.name} · {a.language} · {CATEGORIES[a.category]?.label || a.category}
                   {a.name === def.name ? ' (ברירת המחדל)' : ''}
                 </option>
@@ -213,7 +221,7 @@ export default function WhatsAppTemplatesSettings() {
                 <span className="text-gray-500 shrink-0">שם בעברית:</span>
                 <input
                   className="border rounded p-1.5 w-full bg-white text-sm"
-                  placeholder="למשל: הודעת שיוך משימה"
+                  placeholder={systemTitle(t.name) || 'למשל: הודעת שיוך משימה'}
                   maxLength={80}
                   value={titles[t.name] || ''}
                   onChange={(ev) => setTitles({ ...titles, [t.name]: ev.target.value })}
@@ -222,6 +230,7 @@ export default function WhatsAppTemplatesSettings() {
             )}
             {t.name && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {titleOf(t.name) && <span className="font-semibold text-sm">{titleOf(t.name)}</span>}
                 <span>
                   <span className="text-gray-500">שם התבנית: </span>
                   <span dir="ltr" className="font-mono font-medium break-all">{t.name}</span>

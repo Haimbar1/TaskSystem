@@ -26,6 +26,8 @@ export default function WhatsAppTemplatesSettings() {
   const [draft, setDraft] = useState({});
   // messages whose template is typed in by name (not picked from what Meta returned)
   const [custom, setCustom] = useState({});
+  // the Hebrew name given to each Meta template: { [template name]: title }
+  const [titles, setTitles] = useState({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -34,6 +36,7 @@ export default function WhatsAppTemplatesSettings() {
       .getWhatsAppTemplates()
       .then((d) => {
         setData(d);
+        setTitles(d.titles || {});
         setDraft(Object.fromEntries(d.events.map((e) => [e.key, d.settings[e.key] || d.defaults[e.key]])));
         // a saved template Meta didn't list (and not the default) was typed in — keep editing it that way
         setCustom(
@@ -102,7 +105,7 @@ export default function WhatsAppTemplatesSettings() {
     setSaving(true);
     setMessage('');
     try {
-      await api.updateWhatsAppTemplates(settings);
+      await api.updateWhatsAppTemplates(settings, titles);
       setMessage('נשמר בהצלחה');
     } catch (err) {
       setMessage(err.message?.startsWith('API error') ? 'שגיאה בשמירה' : err.message || 'שגיאה בשמירה');
@@ -188,19 +191,35 @@ export default function WhatsAppTemplatesSettings() {
               onChange={(ev) => chooseTemplate(e.key, ev.target.value)}
             >
               {!data.approved.some((a) => a.name === def.name && a.language === def.language) && (
-                <option value={`${def.name}|${def.language}`}>{def.name} (ברירת המחדל)</option>
+                <option value={`${def.name}|${def.language}`}>
+                  {titles[def.name] ? `${titles[def.name]} — ` : ''}
+                  {def.name} (ברירת המחדל)
+                </option>
               )}
               {!isCustom && !inApproved && !(t.name === def.name && t.language === def.language) && (
                 <option value={`${t.name}|${t.language}`}>{t.name} (לא נמצאה ב-WABA)</option>
               )}
               {data.approved.map((a) => (
                 <option key={`${a.name}|${a.language}`} value={`${a.name}|${a.language}`}>
+                  {titles[a.name] ? `${titles[a.name]} — ` : ''}
                   {a.name} · {a.language} · {CATEGORIES[a.category]?.label || a.category}
                   {a.name === def.name ? ' (ברירת המחדל)' : ''}
                 </option>
               ))}
               <option value="__custom__">✎ הקלדת שם תבנית…</option>
             </select>
+            {t.name && (
+              <label className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500 shrink-0">שם בעברית:</span>
+                <input
+                  className="border rounded p-1.5 w-full bg-white text-sm"
+                  placeholder="למשל: הודעת שיוך משימה"
+                  maxLength={80}
+                  value={titles[t.name] || ''}
+                  onChange={(ev) => setTitles({ ...titles, [t.name]: ev.target.value })}
+                />
+              </label>
+            )}
             {t.name && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span>

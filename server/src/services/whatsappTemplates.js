@@ -92,7 +92,30 @@ let columnReady = false;
 async function ensureColumn() {
   if (columnReady) return;
   await pool.query('ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_templates JSONB');
+  await pool.query('ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_template_titles JSONB');
   columnReady = true;
+}
+
+// The Hebrew name the business gave each Meta template, for the settings screen only:
+// { [template name]: title }.
+export async function getTemplateTitles(tenantId) {
+  await ensureColumn();
+  const { rows } = await pool.query('SELECT whatsapp_template_titles FROM tenants WHERE id = $1', [tenantId]);
+  const saved = rows[0]?.whatsapp_template_titles;
+  return saved && typeof saved === 'object' ? saved : {};
+}
+
+export async function setTemplateTitles(tenantId, input) {
+  const clean = {};
+  for (const [name, title] of Object.entries(input && typeof input === 'object' ? input : {})) {
+    const t = String(title || '').trim().slice(0, 80);
+    if (/^[a-z0-9_]+$/.test(name) && t) clean[name] = t;
+  }
+  await ensureColumn();
+  await pool.query('UPDATE tenants SET whatsapp_template_titles = $1 WHERE id = $2', [
+    Object.keys(clean).length ? JSON.stringify(clean) : null,
+    tenantId,
+  ]);
 }
 
 // The business's own choices: { [eventType]: { name, language, params, body } } — only the

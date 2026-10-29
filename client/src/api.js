@@ -88,8 +88,8 @@ export const api = {
     request('/api/tenants/overdue-check', { method: 'PUT', body: JSON.stringify({ hour }) }),
   runOverdueCheck: () => request('/api/tenants/overdue-check/run', { method: 'POST' }),
   getWhatsAppTemplates: () => request('/api/tenants/whatsapp-templates'),
-  updateWhatsAppTemplates: (settings) =>
-    request('/api/tenants/whatsapp-templates', { method: 'PUT', body: JSON.stringify({ settings }) }),
+  updateWhatsAppTemplates: (settings, titles) =>
+    request('/api/tenants/whatsapp-templates', { method: 'PUT', body: JSON.stringify({ settings, titles }) }),
   getWhatsAppSources: () => request('/api/tenants/whatsapp-sources'),
   takeWhatsAppFrom: ({ origin, tenant_id, whatsapp_phone_number_id }) =>
     request('/api/tenants/whatsapp-settings/take-from', {

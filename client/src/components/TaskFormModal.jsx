@@ -197,12 +197,22 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             and notes); the error shows here too, so a click up here isn't answered out of sight. */}
         <div className="sticky -top-4 -mx-4 -mt-4 px-4 pt-4 pb-2 bg-white border-b z-10">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {sendUpdateBox}
-              <button type="button" onClick={handleCancel} className="px-3 py-1.5 rounded-lg border text-sm">
-                ביטול
+            {/* Closing is an ✕ on the far side from "שמור" — side by side, a tap on a phone could
+                save what someone meant to throw away (Haim, 2026-11-04). */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={handleCancel}
+                title="ביטול (בלי לשמור)"
+                aria-label="ביטול"
+                className="w-9 h-9 -mr-2 shrink-0 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 text-xl leading-none"
+              >
+                ✕
               </button>
+              <h2 className="text-lg font-bold whitespace-nowrap">{isEdit ? 'עריכת משימה' : 'משימה חדשה'}</h2>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+              {sendUpdateBox}
               <button
                 type="submit"
                 disabled={saving}
@@ -423,9 +433,6 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
           )}
           <div className="flex flex-wrap items-center justify-end gap-2">
             {sendUpdateBox}
-            <button type="button" onClick={handleCancel} className="px-3 py-2 rounded-lg border">
-              ביטול
-            </button>
             <button
               type="submit"
               disabled={saving}

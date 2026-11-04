@@ -287,7 +287,9 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
             className="w-full border rounded p-2"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            autoFocus
+            // On a phone an opened task shows without the keyboard covering it (Haim, 2026-11-04);
+            // a new one still starts in its title, since that's typed first.
+            autoFocus={!isEdit || !window.matchMedia?.('(hover: none)').matches}
           />
         </div>
 

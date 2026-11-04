@@ -84,15 +84,13 @@ export default function TableView() {
       {/* On a phone: one card per task, so every task shows without sliding sideways. */}
       <div className="sm:hidden space-y-2">
         {tasks.map((t) => (
-          <div key={t.id} className={`border rounded-lg p-3 space-y-1.5 ${rowColor(t) || 'bg-white'}`}>
+          <div
+            key={t.id}
+            onClick={() => setEditingTask(t)}
+            className={`border rounded-lg p-3 space-y-1.5 cursor-pointer ${rowColor(t) || 'bg-white'}`}
+          >
             <div className="flex items-start gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingTask(t)}
-                className="block flex-1 min-w-0 text-right font-medium text-emerald-700 break-words"
-              >
-                {t.title}
-              </button>
+              <div className="flex-1 min-w-0 text-right font-medium text-emerald-700 break-words">{t.title}</div>
               <TaskThumb task={t} size="w-10 h-10" />
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
@@ -106,11 +104,13 @@ export default function TableView() {
               {t.completed_at && <span>בוצע: {formatDate(t.completed_at)}</span>}
               <span>נוצר: {formatDate(t.created_at)}</span>
             </div>
-            <AssigneePicker
-              users={users}
-              selectedIds={(t.assignees || []).map((a) => a.id)}
-              onChange={(ids) => updateAssignees(t.id, ids)}
-            />
+            <div onClick={(e) => e.stopPropagation()}>
+              <AssigneePicker
+                users={users}
+                selectedIds={(t.assignees || []).map((a) => a.id)}
+                onChange={(ids) => updateAssignees(t.id, ids)}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -132,13 +132,13 @@ export default function TableView() {
         </thead>
         <tbody>
           {tasks.map((t) => (
-            <tr key={t.id} className={`border-b ${rowColor(t)}`}>
-              <td
-                className="p-2 cursor-pointer text-emerald-700 hover:underline"
-                onClick={() => setEditingTask(t)}
-              >
-                {t.title}
-              </td>
+            // A click anywhere on the row opens the task, except on its people (Haim, 2026-11-04)
+            <tr
+              key={t.id}
+              onClick={() => setEditingTask(t)}
+              className={`group border-b cursor-pointer hover:brightness-95 ${rowColor(t)}`}
+            >
+              <td className="p-2 text-emerald-700 group-hover:underline">{t.title}</td>
               <td className="p-1">
                 <TaskThumb task={t} />
               </td>
@@ -148,7 +148,7 @@ export default function TableView() {
                 {isOverdue(t, statuses) && <span className="mr-1 text-xs">(באיחור)</span>}
               </td>
               <td className="p-2">{statusLabel(t.status)}</td>
-              <td className="p-2">
+              <td className="p-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                 <AssigneePicker
                   users={users}
                   selectedIds={(t.assignees || []).map((a) => a.id)}

@@ -2,6 +2,9 @@ import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLOR_OPTIONS } from '../const
 import { useAppContext } from '../context/AppContext.jsx';
 import { isOverdue } from '../utils.js';
 
+// A phone has no double click (and no drag here), so one tap opens the task (Haim, 2026-11-04).
+const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches;
+
 // `saving`: the card was just moved and the server hasn't answered yet — it already sits in its
 // new column, dimmed, and can't be dragged again. `sending`: a WhatsApp update goes out with it.
 // `showStatus`: a pill with the task's status, for boards whose columns aren't statuses.
@@ -16,6 +19,7 @@ export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = 
       draggable={!saving}
       onDragStart={onDragStart}
       onDoubleClick={saving ? undefined : onOpen}
+      onClick={saving ? undefined : () => isTouch() && onOpen?.()}
       title="גרירה להעברה, לחיצה כפולה לפתיחה"
       className={`border rounded-lg p-2 sm:p-2.5 mb-2 break-words shadow-sm transition-shadow space-y-2 ${
         overdue ? 'bg-red-50 border-red-300' : 'bg-white'

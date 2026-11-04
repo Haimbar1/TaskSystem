@@ -18,11 +18,13 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const openRef = useRef(false);
+  const openRectRef = useRef(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
 
   function openMenu() {
     const r = buttonRef.current.getBoundingClientRect();
+    openRectRef.current = { left: r.left, top: r.top };
     const below = window.innerHeight - r.bottom;
     setPos({
       right: window.innerWidth - r.right,
@@ -57,19 +59,26 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
         closeMenu();
       }
     }
-    // the list is pinned to where the button was, so close it once the page moves under it
-    function onScroll(e) {
-      if (!menuRef.current?.contains(e.target)) closeMenu();
+    // The list is pinned to where the button was, so close it once the button really moved away.
+    // On a phone a tap itself nudges the page, and the keyboard opening resizes and scrolls it —
+    // closing on any scroll/resize made the list flash and vanish (Haim, 2026-11-04).
+    function onMove(e) {
+      if (e?.target && menuRef.current?.contains(e.target)) return;
+      const r = buttonRef.current?.getBoundingClientRect();
+      if (!r || !openRectRef.current) return closeMenu();
+      const dx = Math.abs(r.left - openRectRef.current.left);
+      const dy = Math.abs(r.top - openRectRef.current.top);
+      if (dx > 40 || dy > 40) closeMenu();
     }
     document.addEventListener('mousedown', onOutside);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
     return () => {
       document.removeEventListener('mousedown', onOutside);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', closeMenu);
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
     };
   });
 
@@ -113,7 +122,8 @@ export default function AssigneePicker({ users, selectedIds, onChange, block = f
         >
           {users.length >= SEARCH_FROM && (
             <input
-              autoFocus
+              // no keyboard popping over the list on a phone; there you tap the box to search
+              autoFocus={!window.matchMedia?.('(hover: none)').matches}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חיפוש…"

@@ -18,7 +18,7 @@ import {
   getTemplateSettings,
   setTemplateSettings,
 } from '../services/whatsappTemplates.js';
-import { getStatuses, setStatuses, STATUS_COLORS } from '../services/taskStatuses.js';
+import { getStatuses, setStatuses, STATUS_COLORS, DEFAULT_STATUSES } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
 import { getCheckSettings, setCheckHour, runOverdueCheck } from '../services/overdueCheck.js';
@@ -408,7 +408,7 @@ router.put('/whatsapp-templates', requireAuth, requireTenant, requireSuperAdmin,
 // board; the business's admins change them — and inside Monday the embed login, standing in for
 // the admin there (Haim, 2026-10-26).
 router.get('/task-statuses', requireAuth, requireTenant, async (req, res) => {
-  res.json({ statuses: await getStatuses(req.tenantId), colors: STATUS_COLORS });
+  res.json({ statuses: await getStatuses(req.tenantId), colors: STATUS_COLORS, defaults: DEFAULT_STATUSES });
 });
 
 router.put('/task-statuses', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {

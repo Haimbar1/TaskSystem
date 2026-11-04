@@ -43,6 +43,19 @@ export default function StatusSettingsView() {
     setMessage('');
   }
 
+  // Back to the built-in list (DEFAULT_STATUSES on the server) — only on screen until "שמור".
+  async function resetToDefaults() {
+    if (!window.confirm('לחזור לסטטוסים של ברירת המחדל? השינוי יישמר רק אחרי "שמור".')) return;
+    setError('');
+    try {
+      const r = await api.getTaskStatuses();
+      setRows((r.defaults || []).map((s) => ({ ...s })));
+      setMessage('הוחזרו סטטוסי ברירת המחדל — לחצו "שמור" כדי לשמור');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function save() {
     setSaving(true);
     setError('');
@@ -71,7 +84,7 @@ export default function StatusSettingsView() {
 
       <div className="space-y-2">
         {rows.map((row, i) => (
-          <div key={row.key || `new-${i}`} className="flex items-center gap-2 border rounded-lg p-2">
+          <div key={row.key || `new-${i}`} className="flex flex-wrap sm:flex-nowrap items-center gap-2 border rounded-lg p-2">
             <div className="flex flex-col">
               <button
                 type="button"
@@ -135,6 +148,9 @@ export default function StatusSettingsView() {
       <div className="flex items-center gap-2 mt-3">
         <button type="button" onClick={add} className="px-3 py-2 rounded-lg border text-sm">
           + סטטוס חדש
+        </button>
+        <button type="button" onClick={resetToDefaults} className="px-3 py-2 rounded-lg border text-sm text-gray-600">
+          ברירת מחדל
         </button>
         <button
           type="button"

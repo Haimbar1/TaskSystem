@@ -453,11 +453,18 @@ router.post('/:id/send-update', async (req, res) => {
   req.actor = await actorFor(req);
   const result = await sendPendingUpdate({ task, userId: req.actor.userId || req.user.id });
   if (result.changes.length) {
-    const sentTo = [...new Set(result.whatsappMessages.filter((m) => m.sent).map((m) => m.recipientName))];
+    const namesOf = (pick) => [...new Set(result.whatsappMessages.filter(pick).map((m) => m.recipientName))];
+    const sentTo = namesOf((m) => m.sent);
+    const heldFor = namesOf((m) => m.queued);
+    const held = result.whatsappMessages.find((m) => m.queued);
     await recordAction(req, {
       action: 'task_updated',
       task,
-      details: `עדכון וואטסאפ${sentTo.length ? ` נשלח אל: ${sentTo.join(', ')}` : ' — לא נשלח לאף אחד'}`,
+      details: sentTo.length
+        ? `עדכון וואטסאפ נשלח אל: ${sentTo.join(', ')}`
+        : heldFor.length
+          ? `עדכון וואטסאפ ממתין בתור (מחוץ לשעות השליחה) — יישלח ${held.sendAt} אל: ${heldFor.join(', ')}`
+          : 'עדכון וואטסאפ — לא נשלח לאף אחד',
     });
   }
   res.json(result);

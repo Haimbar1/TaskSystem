@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { runScheduledChecks } from '../services/overdueCheck.js';
+import { flushQueue } from '../services/whatsapp.js';
 
 const router = Router();
 
@@ -17,7 +18,9 @@ async function checkOverdue(req, res) {
   if (!authorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  res.json({ businesses: await runScheduledChecks() });
+  // Messages held outside the send window first (whatsapp.js), then the overdue checks.
+  const queue = await flushQueue();
+  res.json({ queue, businesses: await runScheduledChecks() });
 }
 
 router.get('/check-overdue', checkOverdue);

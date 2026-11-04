@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
+// The send window (server/src/services/sendWindow.js): Sunday–Thursday, 08:00–17:00, not holidays.
+const HOURS = Array.from({ length: 9 }, (_, i) => 8 + i); // 08:00–16:00
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
 
 // The overdue check's hour and "בדוק עכשיו" (server/src/services/overdueCheck.js). Business admins
@@ -77,14 +78,17 @@ export default function OverdueCheckSettings() {
         {message && <span className="text-gray-600">{message}</span>}
       </div>
       <p className="text-xs text-gray-500">
-        שעון ישראל. ההודעה יכולה לצאת עד שעה אחרי השעה שנבחרה. "בדוק עכשיו" מריץ את הבדיקה מיד — מי שכבר קיבל היום
+        שעון ישראל. ההודעה יכולה לצאת עד שעה אחרי השעה שנבחרה. הודעות וואטסאפ יוצאות רק בימים א׳–ה׳ בין 08:00 ל-17:00 —
+        לא בשישי, בשבת ובחגים; הבדיקה רצה ביום העבודה הבא בשעה שנבחרה. "בדוק עכשיו" מריץ את הבדיקה מיד — מי שכבר קיבל היום
         תזכורת על אותה משימה לא יקבל שוב.
         {settings.last_checked_on && ` נבדק לאחרונה: ${settings.last_checked_on.split('-').reverse().join('/')}.`}
       </p>
       {result && (
         <div className="text-sm">
           <p>
-            {result.checked
+            {result.outsideWindow
+              ? `לא נשלח כלום — עכשיו מחוץ לשעות השליחה. הבדיקה תרוץ אוטומטית ביום העבודה הבא בשעה שנבחרה (השליחה הקרובה האפשרית: ${result.nextSendAt}).`
+              : result.checked
               ? `נמצאו ${result.checked} משימות באיחור. נשלחו ${result.whatsappMessages.filter((m) => m.sent).length} הודעות` +
                 (result.alreadySent ? `, ${result.alreadySent} כבר קיבלו היום.` : '.')
               : 'אין משימות באיחור.'}

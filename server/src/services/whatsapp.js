@@ -5,6 +5,7 @@ import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
 import { recordMessage } from './whatsappLog.js';
 import { taskLinkFor } from '../routes/openTaskRoutes.js';
+import { inSendWindow, nextSendTime, formatSendTime } from './sendWindow.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
@@ -157,6 +158,21 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     return null;
   }
 
+  // Outside the send window (sendWindow.js): held, not sent — flushQueue sends it at the first slot.
+  if (!inSendWindow()) {
+    await queueMessage({ tenantId, userId, eventType, taskId: task.id, extra });
+    return {
+      to: toWhatsAppNumber(recipient.phone),
+      recipientName: recipient.name || '',
+      templateName: template.name,
+      params: [],
+      text: '',
+      sent: false,
+      queued: true,
+      sendAt: formatSendTime(nextSendTime()),
+    };
+  }
+
   // Opens this task: a 2-day signed link for a business that works through Monday, else a plain one.
   const link = await taskLinkFor({ tenantId, taskId: task.id, userId });
   // Trimmed: a value ending in a space (e.g. a title typed as "בדיקות. ") breaks WhatsApp's *bold*
@@ -230,4 +246,90 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     error,
   });
   return message;
+}
+
+// Messages held outside the send window, one row per task and recipient: a second update for the
+// same task before the window opens joins the first one (its changes added to the summary), so the
+// person gets one message. The task's details (title, status, link) are read again when it's sent.
+const CREATE_QUEUE = `
+CREATE TABLE IF NOT EXISTS whatsapp_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  extra JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (task_id, user_id)
+);`;
+
+let queueReady = false;
+async function ensureQueue() {
+  if (queueReady) return;
+  await pool.query(CREATE_QUEUE);
+  queueReady = true;
+}
+
+// "הועברה לטיפולך" beats a status change, which beats any other change (as in notifications.js).
+const EVENT_RANK = { field_changed: 0, status_changed: 1, assigned: 2 };
+const joinText = (a, b, sep) =>
+  [...new Set([a, b].flatMap((s) => String(s || '').split(sep)).filter(Boolean))].join(sep);
+
+async function queueMessage({ tenantId, userId, eventType, taskId, extra = {} }) {
+  await ensureQueue();
+  const { rows } = await pool.query(
+    'SELECT id, event_type, extra FROM whatsapp_queue WHERE task_id = $1 AND user_id = $2',
+    [taskId, userId]
+  );
+  const was = rows[0];
+  if (!was) {
+    await pool.query(
+      `INSERT INTO whatsapp_queue (tenant_id, task_id, user_id, event_type, extra) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (task_id, user_id) DO UPDATE SET event_type = EXCLUDED.event_type, extra = EXCLUDED.extra`,
+      [tenantId, taskId, userId, eventType, JSON.stringify(extra)]
+    );
+    return;
+  }
+  const merged = { ...was.extra, ...extra };
+  if (was.extra.changeSummary || extra.changeSummary) {
+    merged.changeSummary = joinText(was.extra.changeSummary, extra.changeSummary, ' · ').slice(0, 900);
+  }
+  if (was.extra.changedByName || extra.changedByName) {
+    merged.changedByName = joinText(was.extra.changedByName, extra.changedByName, ', ');
+  }
+  const type = (EVENT_RANK[eventType] ?? 0) >= (EVENT_RANK[was.event_type] ?? 0) ? eventType : was.event_type;
+  await pool.query('UPDATE whatsapp_queue SET event_type = $2, extra = $3 WHERE id = $1', [
+    was.id,
+    type,
+    JSON.stringify(merged),
+  ]);
+}
+
+// Run by the hourly cron (routes/cronRoutes.js): inside the send window, sends every held message.
+// The rows leave the queue before they're sent, so overlapping runs don't both send one.
+export async function flushQueue() {
+  if (!inSendWindow()) return { sent: 0, failed: 0 };
+  await ensureQueue();
+  const { rows } = await pool.query('DELETE FROM whatsapp_queue RETURNING *');
+  let sent = 0;
+  let failed = 0;
+  for (const row of rows.sort((a, b) => a.created_at - b.created_at)) {
+    try {
+      const { rows: tasks } = await pool.query('SELECT * FROM tasks WHERE id = $1', [row.task_id]);
+      if (!tasks[0]) continue;
+      const message = await sendWhatsAppMessage({
+        tenantId: row.tenant_id,
+        userId: row.user_id,
+        eventType: row.event_type,
+        task: tasks[0],
+        extra: row.extra || {},
+      });
+      if (message?.sent) sent++;
+      else failed++;
+    } catch (err) {
+      console.error('[whatsapp queue] send failed', row.id, err);
+      failed++;
+    }
+  }
+  return { sent, failed };
 }

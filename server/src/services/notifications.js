@@ -180,7 +180,8 @@ export async function sendPendingUpdate({ task, userId }) {
     });
     if (message) whatsappMessages.push(message);
   }
-  const sent = whatsappMessages.some((m) => m.sent);
+  // A message held for the send window (whatsapp.js) counts as told: it goes out on its own.
+  const sent = whatsappMessages.some((m) => m.sent || m.queued);
   if (sent || !recipientCount) {
     await pool.query(
       'INSERT INTO task_activity_log (task_id, user_id, field, old_value, new_value) VALUES ($1, $2, $3, NULL, $4)',

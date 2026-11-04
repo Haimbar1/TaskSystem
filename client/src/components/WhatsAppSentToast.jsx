@@ -18,7 +18,8 @@ export default function WhatsAppSentToast() {
     function onSent(e) {
       setMessages(e.detail);
       clearTimeout(timer);
-      timer = setTimeout(() => setMessages(null), 6000);
+      // a held message stays a little longer, so the "not sent yet" is read
+      timer = setTimeout(() => setMessages(null), e.detail?.some((m) => m.queued) ? 12000 : 6000);
     }
     window.addEventListener('whatsapp-sent', onSent);
     return () => {
@@ -42,7 +43,9 @@ export default function WhatsAppSentToast() {
 
   const names = (list) => [...new Set(list.map((m) => m.recipientName || m.to))].join(', ');
   const sent = messages.filter((m) => m.sent);
-  const failed = messages.filter((m) => !m.sent);
+  // Held by the server outside the send window (Sun–Thu 08:00–17:00, not holidays) — not sent yet.
+  const queued = messages.filter((m) => m.queued);
+  const failed = messages.filter((m) => !m.sent && !m.queued);
 
   return (
     <div
@@ -54,6 +57,14 @@ export default function WhatsAppSentToast() {
         <div>
           <span className="text-emerald-700 font-medium">הודעת וואטסאפ נשלחה ל-Meta עבור: </span>
           {names(sent)}
+        </div>
+      )}
+      {queued.length > 0 && (
+        <div>
+          <span className="text-amber-700 font-medium">
+            ההודעה לא נשלחה עדיין — מחוץ לשעות השליחה (א׳–ה׳ 08:00–17:00), נכנסה לתור ותישלח {queued[0].sendAt} אל:{' '}
+          </span>
+          {names(queued)}
         </div>
       )}
       {failed.length > 0 && (

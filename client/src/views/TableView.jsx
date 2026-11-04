@@ -136,7 +136,9 @@ export default function TableView() {
             <tr
               key={t.id}
               onClick={() => setEditingTask(t)}
-              className={`group border-b cursor-pointer hover:brightness-95 ${rowColor(t)}`}
+              // Hover shade as a shadow on the cells — a filter (brightness) on the row would make it
+              // the frame for the assignee list's fixed position, and the list would vanish in it.
+              className={`group border-b cursor-pointer [&:hover>td]:shadow-[inset_0_0_0_999px_rgba(0,0,0,0.05)] ${rowColor(t)}`}
             >
               <td className="p-2 text-emerald-700 group-hover:underline">{t.title}</td>
               <td className="p-1">

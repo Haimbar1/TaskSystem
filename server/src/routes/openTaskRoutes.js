@@ -19,7 +19,8 @@ const router = Router();
 // The approved Meta templates put a comma right after the link and WhatsApp makes it part of the
 // link, so both routes read only the code / task id at the start and ignore whatever trails it.
 
-const LINK_DAYS = 2;
+// A year (Haim, 2026-11-04; was 2 days). The login it gives lasts no longer than the link.
+const LINK_DAYS = 365;
 const CODE_LENGTH = 10;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const CLIENT_URL = () => process.env.CLIENT_URL || 'http://localhost:5173';

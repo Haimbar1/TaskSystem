@@ -31,7 +31,7 @@ export default function Login() {
         </a>
         {linkExpired && (
           <p className="text-sm text-red-600">
-            הקישור למשימה פג תוקף (הוא תקף ליומיים). אפשר לפתוח את המשימה דרך Monday.
+            הקישור למשימה פג תוקף (הוא תקף לשנה). אפשר לפתוח את המשימה דרך Monday.
           </p>
         )}
         {noAccess && (

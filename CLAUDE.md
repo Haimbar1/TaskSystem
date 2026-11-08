@@ -2,16 +2,16 @@
 
 ## Teach the help assistant every new feature (Haim, 2026-11-08)
 
-The help assistant ("העוזר", `client/src/components/HelpWidget.tsx`) has no knowledge of its own in
-this repo: `server/src/routes/helpRoutes.js` forwards questions to the CRM's `/api/help` with
-`module: 'tasks'`, and its knowledge of this system lives in the **Haimbar1/CRM** repository
-(`crm/server/helpBot.ts`, the tasks module).
+The task system has its own help assistant ("העוזר של מערכת המשימות", `client/src/components/HelpWidget.tsx`)
+that answers only about this system. Its brain is shared by all SmartEsek systems and runs in the
+CRM: `server/src/routes/helpRoutes.js` forwards questions to the CRM's `/api/help` with
+`module: 'tasks'`, and with that module the assistant reads only the task system's guide —
+**`TASKS_KNOWLEDGE` in `server/helpKnowledge.ts` of the Haimbar1/CRM repository**. Its ready-made
+questions are the `tasks` case of `suggestedQuestions` in the CRM's `server/helpBot.ts`.
 
-So every user-facing change here (a new button, screen, setting, rule or behaviour) is not done
-until the assistant knows it:
-
-1. Add or update the feature's entry in `docs/help-knowledge.md` (Hebrew, written the way the
-   assistant should explain it: where it is, what it does, what to click, rules and exceptions).
-2. Update the tasks knowledge in Haimbar1/CRM `crm/server/helpBot.ts` to match, and add a
-   suggested question there if the feature is something people will ask about. If the CRM repo
-   isn't available in the session, say so and leave the text in `docs/help-knowledge.md` ready to copy.
+So every user-facing change here (a new button, screen, setting, rule or behaviour, or a changed
+one) is not done until that guide says it, in the same words the screen uses: update
+`TASKS_KNOWLEDGE` (and the short "מערכת המשימות (TaskSystem)" section of `HELP_KNOWLEDGE` in the same
+file, used by the other systems' assistants), add a suggested question when people will ask about
+it, and push the CRM change together with this one. If the CRM repo isn't available in the
+session, say so and give the text to add.

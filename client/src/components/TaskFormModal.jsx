@@ -171,6 +171,27 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     onClose();
   }
 
+  // "העבר לארכיון" (a completed task, before its week is up) / "החזר מהארכיון": saved at once, on
+  // its own — the rest of the form isn't saved with it (server/src/services/taskArchive.js).
+  const [archiving, setArchiving] = useState(false);
+  const isFinal = (key) => !!statuses.find((s) => s.key === key)?.is_final;
+  const canArchive = isEdit && (task.archived_at || isFinal(task.status));
+  async function handleArchive() {
+    const toArchive = !task.archived_at;
+    if (toArchive && !window.confirm(`להעביר את המשימה "${task.title}" לארכיון? היא תוצג רק עם "כולל ארכיון".`)) return;
+    setArchiving(true);
+    setError('');
+    try {
+      const updated = await api.updateTask(task.id, { archived: toArchive });
+      onSaved?.(updated);
+      bumpRefresh?.();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'שגיאה בהעברה לארכיון');
+      setArchiving(false);
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(`למחוק את המשימה "${task.title}"? לא ניתן לשחזר.`)) return;
     setDeleting(true);
@@ -420,16 +441,35 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
+        {isEdit && task.archived_at && (
+          <p className="text-xs text-gray-500">
+            המשימה בארכיון — היא מוצגת רק עם "כולל ארכיון". העברה לסטטוס פתוח או "החזר מהארכיון" מחזירות אותה לרשימות.
+          </p>
+        )}
+
         <div className="flex justify-between items-center pt-2">
           {isEdit ? (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="px-3 py-2 rounded-lg border border-red-600 text-red-600 disabled:opacity-50"
-            >
-              {deleting ? 'מוחק…' : 'מחק משימה'}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-3 py-2 rounded-lg border border-red-600 text-red-600 disabled:opacity-50"
+              >
+                {deleting ? 'מוחק…' : 'מחק משימה'}
+              </button>
+              {canArchive && (
+                <button
+                  type="button"
+                  onClick={handleArchive}
+                  disabled={archiving}
+                  title={task.archived_at ? 'המשימה תחזור לרשימות הרגילות' : 'משימות שהסתיימו עוברות לארכיון לבד שבוע אחרי הביצוע'}
+                  className="px-3 py-2 rounded-lg border border-gray-400 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {archiving ? 'שומר…' : task.archived_at ? 'החזר מהארכיון' : 'העבר לארכיון'}
+                </button>
+              )}
+            </div>
           ) : (
             <span />
           )}

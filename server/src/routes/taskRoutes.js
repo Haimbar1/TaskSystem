@@ -19,8 +19,11 @@ import {
   deleteAttachment,
 } from '../services/taskAttachments.js';
 import { PRIORITY_LABELS } from '../labels.js';
+import { autoArchive, ensureArchiveSchema } from '../services/taskArchive.js';
 
 const router = Router();
+// What PATCH may change (besides assignee_ids and archived): the keys go into the SQL as they are.
+const EDITABLE = ['title', 'description', 'priority', 'due_date', 'status'];
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
 
 // The edit form sends every field back, so compare what it means: a DATE column comes back as a
@@ -36,11 +39,13 @@ function sameValue(stored, sent) {
   return norm(stored) === norm(sent);
 }
 
-// GET /api/tasks?status=new&assignee=<userId>&sort=due_date&dir=asc
+// GET /api/tasks?status=new&assignee=<userId>&sort=due_date&dir=asc&archived=include
+// Archived tasks (services/taskArchive.js) only with archived=include, or when asked for by id.
 // TODO: per-column filtering beyond status/assignee (the table view needs it
 // on every column per the spec) — extend the WHERE-building below.
 router.get('/', async (req, res) => {
-  const { id, status, assignee, q, date_field, from, to, sort = 'created_at', dir = 'desc' } = req.query;
+  const { id, status, assignee, q, date_field, from, to, archived, sort = 'created_at', dir = 'desc' } = req.query;
+  await autoArchive(req.tenantId);
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const params = [req.tenantId];
@@ -55,6 +60,7 @@ router.get('/', async (req, res) => {
     params.push(id);
     where += ` AND t.id = $${params.length}`;
   }
+  if (!id && archived !== 'include') where += ' AND t.archived_at IS NULL';
   if (status) {
     params.push(status);
     where += ` AND t.status = $${params.length}`;
@@ -312,7 +318,12 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  const { assignee_ids, ...fields } = req.body; // { status?, priority?, title?, description?, due_date?, assignee_ids? }
+  // { status?, priority?, title?, description?, due_date?, assignee_ids?, archived? }
+  const { assignee_ids, archived, ...fields } = req.body;
+  for (const key of Object.keys(fields)) {
+    if (!EDITABLE.includes(key)) return res.status(400).json({ error: `Unknown field ${key}` });
+  }
+  await ensureArchiveSchema();
   if (typeof fields.title === 'string') fields.title = fields.title.trim();
 
   const { rows: existingRows } = await pool.query(
@@ -323,18 +334,26 @@ router.patch('/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
   let finals = null;
-  if (fields.status !== undefined) {
+  if (fields.status !== undefined || archived === true) {
     const statuses = await getStatuses(req.tenantId);
-    if (!statuses.some((s) => s.key === fields.status)) return res.status(400).json({ error: 'Unknown status' });
+    if (fields.status !== undefined && !statuses.some((s) => s.key === fields.status)) {
+      return res.status(400).json({ error: 'Unknown status' });
+    }
     finals = finalKeys(statuses);
   }
+  // Only a completed task (in an ending status) goes to the archive.
+  if (archived === true && !finals.includes(fields.status ?? existing.status)) {
+    return res.status(400).json({ error: 'רק משימה שהסתיימה אפשר להעביר לארכיון' });
+  }
+  const archiveChange =
+    archived === true && !existing.archived_at ? 'archive' : archived === false && existing.archived_at ? 'unarchive' : null;
 
   const client = await pool.connect();
   let updated = existing;
   try {
     await client.query('BEGIN');
 
-    if (Object.keys(fields).length > 0) {
+    if (Object.keys(fields).length > 0 || archiveChange) {
       const updates = [];
       const params = [];
       let i = 1;
@@ -345,10 +364,14 @@ router.patch('/:id', async (req, res) => {
       }
       // Completed = in an ending status (בוצע, נדחה…). Moving into one stamps the date; being in
       // any other status clears it, even if the task was completed before.
-      if (finals) {
-        if (!finals.includes(fields.status)) updates.push('completed_at = NULL');
+      // Back in an open status = out of the archive too.
+      if (finals && fields.status !== undefined) {
+        if (!finals.includes(fields.status)) updates.push('completed_at = NULL', 'archived_at = NULL');
         else if (!finals.includes(existing.status) || !existing.completed_at) updates.push('completed_at = now()');
       }
+      if (archiveChange === 'archive') updates.push('archived_at = now()');
+      // Restored by hand: stays out of the archive until it's completed again (taskArchive.js).
+      if (archiveChange === 'unarchive') updates.push('archived_at = NULL', 'unarchived_at = now()');
       params.push(id, req.tenantId);
 
       const { rows } = await client.query(
@@ -381,6 +404,10 @@ router.patch('/:id', async (req, res) => {
     // Inside Monday: the person picked on this device, else the shared login (auditLog.js).
     req.actor = await actorFor(req);
     const actorId = req.actor.userId || req.user.id;
+
+    if (archiveChange) {
+      await recordAction(req, { action: archiveChange === 'archive' ? 'task_archived' : 'task_unarchived', task: updated });
+    }
 
     // One activity-log entry per changed field. WhatsApp waits for "עדכן על שינויים"
     // (POST /:id/send-update below).

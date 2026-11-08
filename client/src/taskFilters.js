@@ -2,7 +2,8 @@
 // becomes GET /api/tasks parameters: words in any field (title, description, notes, assignees,
 // status, priority), and a period — this week
 // (Sunday to Saturday), this month, or between two dates — on the due, created or completed date.
-export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '' };
+// `archived`: also show archived tasks ("כולל ארכיון"; server/src/services/taskArchive.js).
+export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '', archived: false };
 
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -11,6 +12,7 @@ const ymd = (d) =>
 export function filterParams(f) {
   const params = {};
   if (f.q.trim()) params.q = f.q.trim();
+  if (f.archived) params.archived = 'include';
   const today = new Date();
   let from = '';
   let to = '';

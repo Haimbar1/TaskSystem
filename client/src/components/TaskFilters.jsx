@@ -18,7 +18,7 @@ export default function TaskFilters() {
   }, [text]);
 
   const set = (patch) => setFilters((f) => ({ ...f, ...patch }));
-  const active = filters.q || filters.period !== 'all';
+  const active = filters.q || filters.period !== 'all' || filters.archived;
   const field = 'border rounded-lg px-2 py-1.5 text-sm bg-white';
 
   return (
@@ -54,6 +54,14 @@ export default function TaskFilters() {
           <input type="date" value={filters.to} onChange={(e) => set({ to: e.target.value })} className={field} />
         </>
       )}
+      {/* Archived tasks (a week after completion, or by hand) show only when asked for */}
+      <label
+        className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer select-none"
+        title="משימות שהסתיימו עוברות לארכיון שבוע אחרי הביצוע (או בלחיצה על 'העבר לארכיון' בחלון המשימה)"
+      >
+        <input type="checkbox" checked={!!filters.archived} onChange={(e) => set({ archived: e.target.checked })} />
+        כולל ארכיון
+      </label>
       {active && (
         <button
           type="button"

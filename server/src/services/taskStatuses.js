@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { pool } from '../db.js';
 import { STATUS_LABELS } from '../labels.js';
+import { ensureArchiveSchema } from './taskArchive.js';
 
 // Each business sets its own task statuses (the "סטטוסים של משימות" screen under the gear): their
 // order (= the Kanban columns), name, color and whether the status ends the task ("סיום" — e.g. both
@@ -93,14 +94,16 @@ export async function setStatuses(tenantId, input) {
   }
 
   const finals = finalKeys(statuses);
+  await ensureArchiveSchema();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query('UPDATE tenants SET task_statuses = $1 WHERE id = $2', [JSON.stringify(statuses), tenantId]);
-    // A status that became / stopped being an ending one: its tasks follow.
+    // A status that became / stopped being an ending one: its tasks follow (out of the archive too).
     await client.query(
-      `UPDATE tasks SET completed_at = NULL
-       WHERE tenant_id = $1 AND completed_at IS NOT NULL AND NOT (status = ANY($2::text[]))`,
+      `UPDATE tasks SET completed_at = NULL, archived_at = NULL
+       WHERE tenant_id = $1 AND (completed_at IS NOT NULL OR archived_at IS NOT NULL)
+         AND NOT (status = ANY($2::text[]))`,
       [tenantId, finals]
     );
     await client.query(

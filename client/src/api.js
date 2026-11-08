@@ -1,8 +1,14 @@
-import { getActingUserId } from './actingUser.js';
+import { ensureActingUser, getActingUserId, setActingUserId } from './actingUser.js';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-async function request(path, options = {}) {
+// Inside Monday a change waits for "מי את/ה?" when nobody was picked on this device yet
+// (actingUser.js) — except the people list itself, where the first people are added.
+const asksWhoAmI = (path, options) =>
+  (options.method || 'GET') !== 'GET' && !path.startsWith('/api/auth/') && !path.startsWith('/api/users');
+
+async function request(path, options = {}, retried = false) {
+  if (asksWhoAmI(path, options)) await ensureActingUser();
   const actingUser = getActingUserId();
   const res = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
@@ -15,6 +21,11 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
+    // The remembered person is gone (e.g. removed from the business): ask again, once.
+    if (body?.code === 'acting-user-required' && !retried) {
+      setActingUserId('', { remember: false });
+      return request(path, options, true);
+    }
     throw new Error(body?.error || `API error ${res.status}`);
   }
   if (res.status === 204) return null;

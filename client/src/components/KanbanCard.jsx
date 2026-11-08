@@ -57,6 +57,7 @@ export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = 
           </span>
         )}
       </div>
+      {task.creator_name && <div className="text-xs text-gray-400">נפתח ע״י {task.creator_name}</div>}
       {showAssignees && (task.assignees || []).length > 0 && (
         <div className="flex items-center flex-wrap gap-1">
           {task.assignees.map((a) => (

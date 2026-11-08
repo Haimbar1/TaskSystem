@@ -1,8 +1,9 @@
 // The task search's state (kept in AppContext, edited by components/TaskFilters.jsx) and how it
 // becomes GET /api/tasks parameters: words in any field (title, description, notes, assignees,
 // status, priority), and a period — this week
-// (Sunday to Saturday), this month, or between two dates — on the due, created or completed date.
-export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '' };
+// (Sunday to Saturday), this month, or between two dates — on the due, created or completed date —
+// and by person: the tasks someone opened ('created'), or opened or is responsible for ('mine').
+export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '', who: '', whoId: '' };
 
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -11,6 +12,8 @@ const ymd = (d) =>
 export function filterParams(f) {
   const params = {};
   if (f.q.trim()) params.q = f.q.trim();
+  if (f.whoId && f.who === 'created') params.creator = f.whoId;
+  if (f.whoId && f.who === 'mine') params.mine = f.whoId;
   const today = new Date();
   let from = '';
   let to = '';

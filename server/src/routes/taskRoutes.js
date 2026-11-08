@@ -21,7 +21,7 @@ import {
 import { PRIORITY_LABELS } from '../labels.js';
 
 const router = Router();
-const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at'];
+const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at', 'creator_name'];
 
 // The edit form sends every field back, so compare what it means: a DATE column comes back as a
 // Date but is sent as "2026-09-14", and an empty description is null in one and '' in the other.
@@ -36,11 +36,13 @@ function sameValue(stored, sent) {
   return norm(stored) === norm(sent);
 }
 
-// GET /api/tasks?status=new&assignee=<userId>&sort=due_date&dir=asc
+// GET /api/tasks?status=new&assignee=<userId>&creator=<userId>&mine=<userId>&sort=due_date&dir=asc
+// - creator: only the tasks that person opened (created_by)
+// - mine: the tasks that person opened OR is responsible for
 // TODO: per-column filtering beyond status/assignee (the table view needs it
 // on every column per the spec) — extend the WHERE-building below.
 router.get('/', async (req, res) => {
-  const { id, status, assignee, q, date_field, from, to, sort = 'created_at', dir = 'desc' } = req.query;
+  const { id, status, assignee, creator, mine, q, date_field, from, to, sort = 'created_at', dir = 'desc' } = req.query;
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC';
 
   const params = [req.tenantId];
@@ -49,6 +51,8 @@ router.get('/', async (req, res) => {
   if (sortCol === 'status') {
     params.push((await getStatuses(req.tenantId)).map((s) => s.key));
     sortCol = `array_position($${params.length}::text[], t.status)`;
+  } else if (sortCol === 'creator_name') {
+    sortCol = 'MAX(COALESCE(c.name, c.email))';
   }
   let where = 'WHERE t.tenant_id = $1';
   if (id) {
@@ -62,6 +66,17 @@ router.get('/', async (req, res) => {
   if (assignee) {
     params.push(assignee);
     where += ` AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $${params.length})`;
+  }
+  // "פותח המשימה" in the search bar (components/TaskFilters.jsx); ids that aren't uuids are ignored.
+  const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ''));
+  if (isUuid(creator)) {
+    params.push(creator);
+    where += ` AND t.created_by = $${params.length}`;
+  }
+  if (isUuid(mine)) {
+    params.push(mine);
+    where += ` AND (t.created_by = $${params.length}
+      OR EXISTS (SELECT 1 FROM task_assignees ma WHERE ma.task_id = t.id AND ma.user_id = $${params.length}))`;
   }
   // The search bar (components/TaskFilters.jsx): words in the title, description, notes or an
   // assignee's name, or (part of) the status or priority as it's shown…
@@ -104,6 +119,7 @@ router.get('/', async (req, res) => {
     `SELECT t.*,
        (SELECT a.id FROM task_attachments a WHERE a.task_id = t.id AND a.mime_type ~* ${IMAGE_TYPE_SQL}
         ORDER BY a.created_at LIMIT 1) AS thumb_id,
+       MAX(COALESCE(c.name, c.email)) AS creator_name,
        COALESCE(
          json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email))
          FILTER (WHERE u.id IS NOT NULL), '[]'
@@ -111,9 +127,10 @@ router.get('/', async (req, res) => {
      FROM tasks t
      LEFT JOIN task_assignees ta ON ta.task_id = t.id
      LEFT JOIN users u ON u.id = ta.user_id
+     LEFT JOIN users c ON c.id = t.created_by
      ${where}
      GROUP BY t.id
-     ORDER BY ${sortCol} ${sortDir}`,
+     ORDER BY ${sortCol} ${sortDir} NULLS LAST`,
     params
   );
   res.json(rows);
@@ -428,7 +445,10 @@ router.patch('/:id', async (req, res) => {
        JOIN users u ON u.id = ta.user_id WHERE ta.task_id = $1`,
       [id]
     );
-    res.json({ ...updated, assignees: assigneeRows });
+    const { rows: creatorRows } = await pool.query('SELECT COALESCE(name, email) AS name FROM users WHERE id = $1', [
+      updated.created_by,
+    ]);
+    res.json({ ...updated, assignees: assigneeRows, creator_name: creatorRows[0]?.name || null });
   } catch (err) {
     console.error('PATCH /api/tasks/:id failed:', err);
     await client.query('ROLLBACK');

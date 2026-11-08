@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { api } from '../api.js';
+import { getActingUserId } from '../actingUser.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { EMPTY_FILTERS } from '../taskFilters.js';
 
@@ -6,9 +8,17 @@ import { EMPTY_FILTERS } from '../taskFilters.js';
 // switching views; see taskFilters.js).
 const DATE_FIELDS = { due_date: 'תאריך יעד', created_at: 'תאריך יצירה', completed_at: 'תאריך ביצוע' };
 const PERIODS = { all: 'כל התאריכים', week: 'השבוע', month: 'החודש', range: 'בין תאריכים' };
+// By person: who opened the task, or who opened it or is responsible for it.
+const WHO = { '': 'כל הפותחים', created: 'נפתחו ע״י', mine: 'נפתחו ע״י או באחריות' };
 
 export default function TaskFilters() {
-  const { filters, setFilters } = useAppContext();
+  const { filters, setFilters, user } = useAppContext();
+  const [users, setUsers] = useState([]);
+  useEffect(() => {
+    api.getUsers().then(setUsers).catch(console.error);
+  }, []);
+  // "Me": the logged-in person, or inside Monday whoever was picked in "מי את/ה?".
+  const meId = user?.is_embed ? getActingUserId() : user?.id;
   // Typing is applied after a short pause, not on every key.
   const [text, setText] = useState(filters.q);
   useEffect(() => {
@@ -18,7 +28,7 @@ export default function TaskFilters() {
   }, [text]);
 
   const set = (patch) => setFilters((f) => ({ ...f, ...patch }));
-  const active = filters.q || filters.period !== 'all';
+  const active = filters.q || filters.period !== 'all' || filters.who;
   const field = 'border rounded-lg px-2 py-1.5 text-sm bg-white';
 
   return (
@@ -43,6 +53,33 @@ export default function TaskFilters() {
           {Object.entries(DATE_FIELDS).map(([value, label]) => (
             <option key={value} value={value}>
               לפי {label}
+            </option>
+          ))}
+        </select>
+      )}
+      <select
+        value={filters.who}
+        // Choosing a person filter starts with me (unless someone was already chosen).
+        onChange={(e) => set({ who: e.target.value, whoId: e.target.value ? filters.whoId || meId || '' : '' })}
+        className={field}
+        title="סינון לפי מי שפתח את המשימה — או גם מי שאחראי עליה"
+      >
+        {Object.entries(WHO).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      {filters.who && (
+        <select
+          value={filters.whoId}
+          onChange={(e) => set({ whoId: e.target.value })}
+          className={`${field} ${filters.whoId ? '' : 'bg-amber-200'}`}
+        >
+          <option value="">בחר/י…</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.id === meId ? `אני (${u.name || u.email})` : u.name || u.email}
             </option>
           ))}
         </select>

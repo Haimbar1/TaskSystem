@@ -74,6 +74,7 @@ export default function TableView() {
     ['due_date', 'תאריך יעד'],
     ['status', 'סטטוס'],
     ['assignees', 'אחראים'],
+    ['creator_name', 'פותח המשימה'],
     ['completed_at', 'תאריך ביצוע'],
     ['created_at', 'תאריך יצירה'],
   ];
@@ -103,6 +104,7 @@ export default function TableView() {
               )}
               {t.completed_at && <span>בוצע: {formatDate(t.completed_at)}</span>}
               <span>נוצר: {formatDate(t.created_at)}</span>
+              {t.creator_name && <span>נפתח ע״י: {t.creator_name}</span>}
             </div>
             <div onClick={(e) => e.stopPropagation()}>
               <AssigneePicker
@@ -157,6 +159,7 @@ export default function TableView() {
                   onChange={(ids) => updateAssignees(t.id, ids)}
                 />
               </td>
+              <td className="p-2">{t.creator_name || '—'}</td>
               <td className="p-2">{formatDate(t.completed_at)}</td>
               <td className="p-2">{formatDate(t.created_at)}</td>
             </tr>

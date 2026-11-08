@@ -222,6 +222,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
               </button>
             </div>
           </div>
+          {isEdit && task.creator_name && <p className="text-xs text-gray-500 mt-1">נפתחה ע״י {task.creator_name}</p>}
           {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
         </div>
 
@@ -265,7 +266,7 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
 
         {needsCreator && (
           <div>
-            <label className="block text-sm mb-1">יוצר המשימה *</label>
+            <label className="block text-sm mb-1">פותח המשימה *</label>
             <select
               className="w-full border rounded p-2"
               value={createdBy}

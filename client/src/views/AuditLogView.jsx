@@ -7,6 +7,8 @@ const ACTION = {
   task_created: 'משימה נוצרה',
   task_updated: 'משימה עודכנה',
   task_deleted: 'משימה נמחקה',
+  task_archived: 'משימה הועברה לארכיון',
+  task_unarchived: 'משימה הוחזרה מהארכיון',
   note_added: 'הערה נוספה',
   attachment_added: 'קובץ צורף',
   attachment_deleted: 'קובץ נמחק',

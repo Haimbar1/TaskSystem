@@ -10,6 +10,7 @@ import { formatDate, isOverdue } from '../utils.js';
 import PageFrame from '../components/PageFrame.jsx';
 import TaskFilters from '../components/TaskFilters.jsx';
 import { filterParams } from '../taskFilters.js';
+import ArchivedBadge from '../components/ArchivedBadge.jsx';
 
 // TODO: per-column filtering (the spec asks for sort + filter on every
 // column) — only sorting is wired up so far.
@@ -91,7 +92,10 @@ export default function TableView() {
             className={`border rounded-lg p-3 space-y-1.5 cursor-pointer ${rowColor(t) || 'bg-white'}`}
           >
             <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0 text-right font-medium text-emerald-700 break-words">{t.title}</div>
+              <div className="flex-1 min-w-0 text-right font-medium text-emerald-700 break-words">
+                {t.title}
+                {t.archived_at && <ArchivedBadge />}
+              </div>
               <TaskThumb task={t} size="w-10 h-10" />
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
@@ -142,7 +146,10 @@ export default function TableView() {
               // the frame for the assignee list's fixed position, and the list would vanish in it.
               className={`group border-b cursor-pointer [&:hover>td]:shadow-[inset_0_0_0_999px_rgba(0,0,0,0.05)] ${rowColor(t)}`}
             >
-              <td className="p-2 text-emerald-700 group-hover:underline">{t.title}</td>
+              <td className="p-2">
+                <span className="text-emerald-700 group-hover:underline">{t.title}</span>
+                {t.archived_at && <ArchivedBadge />}
+              </td>
               <td className="p-1">
                 <TaskThumb task={t} />
               </td>

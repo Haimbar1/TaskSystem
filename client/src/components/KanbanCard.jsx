@@ -1,6 +1,7 @@
 import { PRIORITY_COLORS, PRIORITY_LABELS, STATUS_COLOR_OPTIONS } from '../constants.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { isOverdue } from '../utils.js';
+import ArchivedBadge from './ArchivedBadge.jsx';
 
 // A phone has no double click (and no drag here), so one tap opens the task (Haim, 2026-11-04).
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches;
@@ -25,7 +26,10 @@ export default function KanbanCard({ task, onDragStart, onOpen, showAssignees = 
         overdue ? 'bg-red-50 border-red-300' : 'bg-white'
       } ${saving ? 'opacity-60 cursor-wait border-emerald-300' : 'cursor-move hover:shadow-md'}`}
     >
-      <div className="text-sm font-medium text-gray-800">{task.title}</div>
+      <div className="text-sm font-medium text-gray-800">
+        {task.title}
+        {task.archived_at && <ArchivedBadge />}
+      </div>
       {saving && <div className="text-xs text-emerald-700">{sending ? 'שומר ושולח עדכון…' : 'שומר…'}</div>}
       <div className="flex items-center flex-wrap gap-1">
         {showStatus && task.status && (

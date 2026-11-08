@@ -3,7 +3,10 @@
 // status, priority), and a period — this week
 // (Sunday to Saturday), this month, or between two dates — on the due, created or completed date —
 // and by person: the tasks someone opened ('created'), or opened or is responsible for ('mine').
-export const EMPTY_FILTERS = { q: '', period: 'all', dateField: 'due_date', from: '', to: '', who: '', whoId: '' };
+// `archived`: also show archived tasks ("כולל ארכיון"; server/src/services/taskArchive.js).
+export const EMPTY_FILTERS = {
+  q: '', period: 'all', dateField: 'due_date', from: '', to: '', archived: false, who: '', whoId: '',
+};
 
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -14,6 +17,7 @@ export function filterParams(f) {
   if (f.q.trim()) params.q = f.q.trim();
   if (f.whoId && f.who === 'created') params.creator = f.whoId;
   if (f.whoId && f.who === 'mine') params.mine = f.whoId;
+  if (f.archived) params.archived = 'include';
   const today = new Date();
   let from = '';
   let to = '';

@@ -4,7 +4,7 @@ import { logActivity, previewPendingUpdate, sendPendingUpdate } from '../service
 import { EMBED_USER_EMAIL, isEmbedUser } from '../embed.js';
 import { takePendingTask } from './openTaskRoutes.js';
 import { getStatuses, finalKeys } from '../services/taskStatuses.js';
-import { actorFor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
+import { actorFor, requireActor, recordAction, describeFieldChange, userNames } from '../services/auditLog.js';
 import { listNotes, addNote } from '../services/taskNotes.js';
 import {
   MAX_BYTES,
@@ -21,6 +21,9 @@ import {
 import { PRIORITY_LABELS } from '../labels.js';
 
 const router = Router();
+// Inside Monday every change says who made it (services/auditLog.js) — except creating a task,
+// whose form names its creator itself (created_by below).
+router.use((req, res, next) => (req.method === 'POST' && req.path === '/' ? next() : requireActor(req, res, next)));
 const SORTABLE = ['title', 'status', 'priority', 'due_date', 'completed_at', 'created_at', 'creator_name'];
 
 // The edit form sends every field back, so compare what it means: a DATE column comes back as a

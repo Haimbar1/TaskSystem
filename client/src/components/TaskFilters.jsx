@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { getActingUserId } from '../actingUser.js';
+import { ensureActingUser, useActingUserId } from '../actingUser.js';
 import { useAppContext } from '../context/AppContext.jsx';
 import { EMPTY_FILTERS } from '../taskFilters.js';
 
@@ -18,7 +18,8 @@ export default function TaskFilters() {
     api.getUsers().then(setUsers).catch(console.error);
   }, []);
   // "Me": the logged-in person, or inside Monday whoever was picked in "מי את/ה?".
-  const meId = user?.is_embed ? getActingUserId() : user?.id;
+  const actingId = useActingUserId();
+  const meId = user?.is_embed ? actingId : user?.id;
   // Typing is applied after a short pause, not on every key.
   const [text, setText] = useState(filters.q);
   useEffect(() => {
@@ -60,7 +61,14 @@ export default function TaskFilters() {
       <select
         value={filters.who}
         // Choosing a person filter starts with me (unless someone was already chosen).
-        onChange={(e) => set({ who: e.target.value, whoId: e.target.value ? filters.whoId || meId || '' : '' })}
+        onChange={async (e) => {
+          const who = e.target.value;
+          if (!who) return set({ who, whoId: '' });
+          if (filters.whoId) return set({ who });
+          // Starts with "me" — inside Monday that's asked first if nobody was picked yet.
+          const me = user?.is_embed ? await ensureActingUser().catch(() => '') : meId;
+          set({ who, whoId: me || '' });
+        }}
         className={field}
         title="סינון לפי מי שפתח את המשימה — או גם מי שאחראי עליה"
       >

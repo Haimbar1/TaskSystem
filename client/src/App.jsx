@@ -16,6 +16,8 @@ import WhatsAppSentToast from './components/WhatsAppSentToast.jsx';
 import { HelpWidget } from './components/HelpWidget.tsx';
 import { helpFetch } from './api.js';
 import PendingTaskOpener from './components/PendingTaskOpener.jsx';
+import ActingUserPrompt from './components/ActingUserPrompt.jsx';
+import { initActingUser } from './actingUser.js';
 import { AppProvider } from './context/AppContext.jsx';
 import { api } from './api.js';
 
@@ -42,7 +44,12 @@ export default function App() {
       window.location.href = `${API_URL}/api/auth/embed?token=${encodeURIComponent(embedToken)}`;
       return;
     }
-    api.me().then((res) => setUser(res.user)).catch(() => setUser(null)).finally(() => setLoading(false));
+    api
+      .me()
+      .then((res) => {
+        initActingUser(res.user);
+        setUser(res.user);
+      }).catch(() => setUser(null)).finally(() => setLoading(false));
   }, []);
 
   if (loading) return null;
@@ -103,6 +110,7 @@ export default function App() {
         welcome="שלום! אני העוזר של מערכת המשימות — אסביר איך יוצרים משימה, משייכים אחראים, משנים סטטוס בקנבן, ומתי נשלחות הודעות וואטסאפ. כתבו שאלה, צרפו צילום מסך (📎), או בחרו שאלה:"
       />
       <PendingTaskOpener />
+      {user.is_embed && <ActingUserPrompt />}
     </AppProvider>
   );
 }

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { provisionFromPortal } from '../portalProvision.js';
 import { userForEmbedToken, isEmbedUser, getEmbedToken } from '../embed.js';
+import { businessUser, cookieActingUser, setActingUserCookie } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -179,6 +180,15 @@ router.post('/logout', (req, res) => {
   req.logout(() => res.json({ ok: true }));
 });
 
+// Inside Monday: remembers on this device who picked "מי את/ה?" (services/auditLog.js); empty forgets.
+router.put('/acting-user', async (req, res) => {
+  if (!isEmbedUser(req.user)) return res.status(400).json({ error: 'Only inside Monday' });
+  const userId = req.body?.userId || '';
+  if (userId && !(await businessUser(req.user.tenant_id, userId))) return res.status(404).json({ error: 'Not found' });
+  setActingUserCookie(res, userId);
+  res.json({ ok: true });
+});
+
 router.get('/me', async (req, res) => {
   if (!req.user) return res.json({ user: null });
 
@@ -196,6 +206,8 @@ router.get('/me', async (req, res) => {
       activeTenantName: rows[0]?.name || null,
       activePortalTenantId: rows[0]?.portal_tenant_id ?? null,
       is_embed: isEmbedUser(req.user),
+      // Inside Monday: who was picked in "מי את/ה?" on this device, if remembered.
+      acting_user_id: isEmbedUser(req.user) ? (await businessUser(req.user.tenant_id, cookieActingUser(req)))?.id || null : null,
       // Super admins manage the users of embedded businesses here (their people never log in
       // through the portal, which is where users are managed otherwise).
       activeTenantHasEmbed: req.user.is_super_admin ? Boolean(await getEmbedToken(activeTenantId)) : false,

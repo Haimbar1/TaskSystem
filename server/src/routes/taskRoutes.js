@@ -164,7 +164,7 @@ router.get('/:id/notes', async (req, res) => {
 router.post('/:id/notes', async (req, res) => {
   const body = String(req.body?.body ?? '').trim();
   if (!body) return res.status(400).json({ error: 'ההערה ריקה' });
-  const { rows } = await pool.query('SELECT id, title FROM tasks WHERE id = $1 AND tenant_id = $2', [
+  const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND tenant_id = $2', [
     req.params.id,
     req.tenantId,
   ]);
@@ -176,7 +176,12 @@ router.post('/:id/notes', async (req, res) => {
   }
   const note = await addNote(task.id, req.actor, body);
   await recordAction(req, { action: 'note_added', task, details: body.length > 80 ? `${body.slice(0, 80)}…` : body });
-  res.status(201).json(note);
+  // A note is usually meant for someone (Haim, 2026-11-15: "עמי, יצרת קשר…?" reached no one), so it
+  // goes out on WhatsApp right away, with the task's other changes still waiting for an update.
+  const userId = req.actor.userId || req.user.id;
+  await logActivity({ task, userId, field: 'note', oldValue: null, newValue: body, eventType: 'field_changed' });
+  const whatsappUpdate = await sendUpdateAndRecord(req, task);
+  res.status(201).json({ ...note, whatsappUpdate });
 });
 
 // The task's files ("קבצים מצורפים"), oldest first, without their contents; see services/taskAttachments.js.
@@ -198,7 +203,7 @@ router.post(
       fileName = decodeURIComponent(req.get('x-file-name') || '').trim().slice(0, 255) || fileName;
     } catch {}
     const mimeType = (req.get('x-file-type') || '').trim().slice(0, 120) || 'application/octet-stream';
-    const { rows } = await pool.query('SELECT id, title FROM tasks WHERE id = $1 AND tenant_id = $2', [
+    const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND tenant_id = $2', [
       req.params.id,
       req.tenantId,
     ]);
@@ -210,6 +215,15 @@ router.post(
     }
     const attachment = await addAttachment(task.id, req.actor, { fileName, mimeType, data: req.body });
     await recordAction(req, { action: 'attachment_added', task, details: fileName });
+    // Told about with the task's next WhatsApp update.
+    await logActivity({
+      task,
+      userId: req.actor.userId || req.user.id,
+      field: 'attachment',
+      oldValue: null,
+      newValue: fileName,
+      eventType: 'field_changed',
+    });
     res.status(201).json(attachment);
   }
 );
@@ -325,7 +339,8 @@ router.post('/', async (req, res) => {
       newValue: null,
       eventType: 'assigned',
     });
-    res.status(201).json(task);
+    const whatsappUpdate = req.body.send_update ? await sendUpdateAndRecord(req, task) : null;
+    res.status(201).json({ ...task, whatsappUpdate });
   } catch (err) {
     console.error('POST /api/tasks failed:', err);
     await client.query('ROLLBACK');
@@ -338,8 +353,8 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  // { status?, priority?, title?, description?, due_date?, assignee_ids?, archived? }
-  const { assignee_ids, archived, ...fields } = req.body;
+  // { status?, priority?, title?, description?, due_date?, assignee_ids?, archived?, send_update? }
+  const { assignee_ids, archived, send_update, ...fields } = req.body;
   for (const key of Object.keys(fields)) {
     if (!EDITABLE.includes(key)) return res.status(400).json({ error: `Unknown field ${key}` });
   }
@@ -478,7 +493,8 @@ router.patch('/:id', async (req, res) => {
     const { rows: creatorRows } = await pool.query('SELECT COALESCE(name, email) AS name FROM users WHERE id = $1', [
       updated.created_by,
     ]);
-    res.json({ ...updated, assignees: assigneeRows, creator_name: creatorRows[0]?.name || null });
+    const whatsappUpdate = send_update ? await sendUpdateAndRecord(req, updated) : null;
+    res.json({ ...updated, assignees: assigneeRows, creator_name: creatorRows[0]?.name || null, whatsappUpdate });
   } catch (err) {
     console.error('PATCH /api/tasks/:id failed:', err);
     await client.query('ROLLBACK');
@@ -501,7 +517,22 @@ router.post('/:id/send-update', async (req, res) => {
   const task = rows[0];
   if (!task) return res.status(404).json({ error: 'Not found' });
   req.actor = await actorFor(req);
-  const result = await sendPendingUpdate({ task, userId: req.actor.userId || req.user.id });
+  res.json(await sendUpdateAndRecord(req, task));
+});
+
+// Sends the task's pending WhatsApp update and notes in the activity log who got it. Called within
+// the request that made the change (creating/saving with "שלח עדכון בוואטסאפ", adding a note), not as
+// a second request from the browser: a phone closed right after "שמור" never sent that one.
+// req.actor must already be set (actorFor). A failure is logged and returned, never thrown — the
+// change itself was saved.
+async function sendUpdateAndRecord(req, task) {
+  let result;
+  try {
+    result = await sendPendingUpdate({ task, userId: req.actor.userId || req.user.id });
+  } catch (err) {
+    console.error(`WhatsApp update for task ${task.id} failed:`, err);
+    return { changes: [], recipientCount: 0, whatsappMessages: [], sent: false, error: err.message };
+  }
   if (result.changes.length) {
     const namesOf = (pick) => [...new Set(result.whatsappMessages.filter(pick).map((m) => m.recipientName))];
     const sentTo = namesOf((m) => m.sent);
@@ -517,8 +548,8 @@ router.post('/:id/send-update', async (req, res) => {
           : 'עדכון וואטסאפ — לא נשלח לאף אחד',
     });
   }
-  res.json(result);
-});
+  return result;
+}
 
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;

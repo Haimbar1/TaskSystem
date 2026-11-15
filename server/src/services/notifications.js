@@ -20,9 +20,16 @@ const doneLines = (text) =>
     .filter((l) => l.startsWith(DONE_MARK))
     .map((l) => l.slice(DONE_MARK.length).trim());
 
+// Notes and files are logged one row per item added (APPENDED); pendingChanges joins the ones since
+// the last update with ITEM_SEP.
+const APPENDED = ['note', 'attachment'];
+const ITEM_SEP = '\u001f';
+
 async function describeChange(tenantId, field, oldValue, newValue) {
   if (field === 'created') return 'המשימה נוצרה';
   if (field === 'assignees') return 'האחראים על המשימה עודכנו';
+  if (field === 'note') return String(newValue || '').split(ITEM_SEP).map((n) => `הערה: "${n}"`).join(' · ');
+  if (field === 'attachment') return `קובץ צורף: ${String(newValue || '').split(ITEM_SEP).join(', ')}`;
   if (field === 'description') {
     // only lines ticked or unticked: say which, rather than repeating the whole text
     const strip = (t) => String(t || '').split('\n').map((l) => (l.startsWith(DONE_MARK) ? l.slice(DONE_MARK.length) : l.startsWith(OPEN_MARK) ? l.slice(OPEN_MARK.length) : l)).join('\n');
@@ -45,7 +52,8 @@ async function describeChange(tenantId, field, oldValue, newValue) {
 // whatsappTemplates.js (TEMPLATE_EVENTS) and the help assistant (crm/server/helpKnowledge.ts).
 // - created / assignees changed: only the people newly assigned ("הועברה לטיפולך")
 // - status: the assignees, the task's creator and its watchers
-// - description: the assignees only
+// - description, a file added: the assignees only
+// - a note ("הערות ביצוע"): the assignees, the task's creator and its watchers
 // - anything else (title, priority, due date): no one — it's only logged
 async function recipientsFor(task, field, oldValue, newValue) {
   const { rows } = await pool.query('SELECT user_id FROM task_assignees WHERE task_id = $1', [task.id]);
@@ -56,8 +64,8 @@ async function recipientsFor(task, field, oldValue, newValue) {
     const before = String(oldValue || '').split(',');
     return assignees.filter((id) => !before.includes(id));
   }
-  if (field === 'description') return assignees;
-  if (field === 'status') {
+  if (field === 'description' || field === 'attachment') return assignees;
+  if (field === 'status' || field === 'note') {
     const { rows: watcherRows } = await pool.query('SELECT user_id FROM task_watchers WHERE task_id = $1', [task.id]);
     const ids = new Set([...assignees, ...watcherRows.map((r) => r.user_id)]);
     if (task.created_by) ids.add(task.created_by);
@@ -113,7 +121,8 @@ async function pendingChanges(task) {
   const byField = new Map();
   for (const r of rows) {
     const c = byField.get(r.field) || { field: r.field, oldValue: r.old_value, actorIds: new Set(), actorNames: new Set() };
-    c.newValue = r.new_value;
+    // every note / file added counts, not just the last one
+    c.newValue = APPENDED.includes(r.field) && c.newValue ? `${c.newValue}${ITEM_SEP}${r.new_value}` : r.new_value;
     if (r.user_id) c.actorIds.add(r.user_id);
     if (r.user_name) c.actorNames.add(r.user_name);
     byField.set(r.field, c);

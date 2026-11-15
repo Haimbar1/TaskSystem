@@ -40,6 +40,11 @@ function announceWhatsApp(result) {
   }
   return result;
 }
+// The same for a save or a note that sent the update along with it.
+function announceUpdate(saved) {
+  if (saved?.whatsappUpdate) announceWhatsApp(saved.whatsappUpdate);
+  return saved;
+}
 
 // For the help assistant (components/HelpWidget.tsx): a plain fetch with this site's login cookie
 export const helpFetch = (path, init = {}) => fetch(`${API_URL}${path}`, { credentials: 'include', ...init });
@@ -47,13 +52,17 @@ export const helpFetch = (path, init = {}) => fetch(`${API_URL}${path}`, { crede
 export const api = {
   getTasks: (params = {}) => request(`/api/tasks?${new URLSearchParams(params)}`),
   getPendingTask: () => request('/api/tasks/pending-open'),
-  createTask: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
-  updateTask: (id, data) => request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  // With send_update: true the server also sends the WhatsApp update ({ ...task, whatsappUpdate }).
+  createTask: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }).then(announceUpdate),
+  updateTask: (id, data) =>
+    request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then(announceUpdate),
   getPendingUpdate: (id) => request(`/api/tasks/${id}/pending-update`),
   sendTaskUpdate: (id) => request(`/api/tasks/${id}/send-update`, { method: 'POST' }).then(announceWhatsApp),
   deleteTask: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   getTaskNotes: (id) => request(`/api/tasks/${id}/notes`),
-  addTaskNote: (id, body) => request(`/api/tasks/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }),
+  // A note goes out on WhatsApp as soon as it's added ({ ...note, whatsappUpdate }).
+  addTaskNote: (id, body) =>
+    request(`/api/tasks/${id}/notes`, { method: 'POST', body: JSON.stringify({ body }) }).then(announceUpdate),
   getTaskAttachments: (id) => request(`/api/tasks/${id}/attachments`),
   // The file goes as the raw body (see server/src/routes/taskRoutes.js), its name/type in headers.
   addTaskAttachment: (id, file) =>

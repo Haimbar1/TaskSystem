@@ -135,8 +135,16 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
     onClose();
     const name = title.trim();
     const files = isEdit ? [] : pendingFiles.map((p) => p.file);
-    (isEdit ? api.updateTask(task.id, payload) : api.createTask(payload))
+    // The server sends the WhatsApp update within the save itself, so it isn't lost when the page
+    // closes right after (a phone, or the uploads below taking a while).
+    const request = { ...payload, send_update: sendUpdate };
+    (isEdit ? api.updateTask(task.id, request) : api.createTask(request))
       .then(async (saved) => {
+        if (saved.whatsappUpdate?.error) {
+          window.dispatchEvent(new CustomEvent('task-save-failed', {
+            detail: `המשימה "${name}" נשמרה, אבל שליחת העדכון בוואטסאפ נכשלה: ${saved.whatsappUpdate.error}`,
+          }));
+        }
         // A new task's files go up before the views reload, so its thumbnail is there.
         const failed = [];
         for (const file of files) {
@@ -148,13 +156,6 @@ export default function TaskFormModal({ task, onClose, onSaved, onCreated, onDel
           }));
         }
         (onSaved || onCreated)?.(saved);
-        if (!sendUpdate) return;
-        api.sendTaskUpdate(saved.id).catch((err) => {
-          console.error(err);
-          window.dispatchEvent(new CustomEvent('task-save-failed', {
-            detail: `המשימה "${name}" נשמרה, אבל שליחת העדכון בוואטסאפ נכשלה: ${err.message}`,
-          }));
-        });
       })
       .catch((err) => {
         console.error(err);

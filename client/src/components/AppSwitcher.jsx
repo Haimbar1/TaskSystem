@@ -11,11 +11,16 @@ const WA_ICON = (
   </svg>
 );
 
-const ICONS = { CRM: '📇', WHATSAPP: WA_ICON, TASKS: '✅', BOTAPP: '🤖' };
+const ICONS = { CRM: '📇', WHATSAPP: WA_ICON, TASKS: '✅', BOTAPP: '🤖', SITE: '🌐', PRICING: '🧮', PURCHASING: '🛒', ONBOARDING: '🚀', TASKSYSTEM: '✅' };
+
+// The marketing module (organic + paid posts) - a white megaphone on blue (Haim, 2026-11-19); by its
+// key, or its name if the key was typed differently.
+const isMarketingModule = (m) => String(m.key || '').toLowerCase() === 'marketing' || /פרסום|פירסום|שיווק/.test(m.name || '');
 
 // Short labels — the portal's names start with "מערכת", which cut off the actual name.
 const NAMES = { CRM: 'CRM', WHATSAPP: 'ואטסאפ', TASKS: 'משימות', BOTAPP: 'בוט' };
-const shortName = (m) => NAMES[m.key.toUpperCase()] || m.name.replace(/^מערכת\s+/, '');
+// no "מערכת" anywhere in the label (Haim, 2026-11-19)
+const shortName = (m) => NAMES[m.key.toUpperCase()] || m.name.replace(/מערכת\s*/g, '').trim() || m.name;
 
 export default function AppSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
@@ -88,7 +93,13 @@ export default function AppSwitcher() {
                   title={m.name}
                   className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
-                  <span className="text-2xl">{ICONS[m.key.toUpperCase()] || m.icon || '🔗'}</span>
+                  {isMarketingModule(m) ? (
+                    <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
+                    </span>
+                  ) : (
+                    <span className="text-2xl">{ICONS[m.key.toUpperCase()] || m.icon || '🔗'}</span>
+                  )}
                   <span className="text-xs text-gray-600 truncate w-full text-center">{shortName(m)}</span>
                 </button>
               ))}

@@ -1,6 +1,12 @@
 // When WhatsApp messages may go out (Haim, 2026-11-04): Sunday–Thursday, 08:00–17:00 Israel time,
 // never on Friday, Saturday or a holiday. A message asked for outside the window waits in the
 // queue (whatsapp.js) and goes out on the first hourly cron run inside it (routes/cronRoutes.js).
+//
+// "שליחת הודעות וואטסאפ בכל שעה" (Haim, 2026-11-24): a business that turns this on in its WhatsApp
+// settings (tenants.whatsapp_any_hour) has no window at all — every hour, every day, holidays too.
+// Its messages go out at once and its daily overdue check may be at any hour (overdueCheck.js).
+
+import { pool } from '../db.js';
 
 const TZ = 'Asia/Jerusalem';
 export const SEND_FROM_HOUR = 8;
@@ -26,6 +32,11 @@ function isIndependenceDay(day, weekday) {
   return false;
 }
 
+// Friday or Saturday in Israel — the overdue check of a business that sends at any hour skips them.
+export function isWeekend(date = new Date()) {
+  return ['Fri', 'Sat'].includes(partsOf(date, { weekday: 'short' }).weekday);
+}
+
 export function isRestDay(date = new Date()) {
   const { weekday, day, month } = partsOf(date, { weekday: 'short', day: 'numeric', month: 'long' });
   if (weekday === 'Fri' || weekday === 'Sat') return true;
@@ -37,6 +48,36 @@ export function isRestDay(date = new Date()) {
 export function inSendWindow(date = new Date()) {
   const hour = Number(partsOf(date, { hour: 'numeric', hourCycle: 'h23' }).hour);
   return hour >= SEND_FROM_HOUR && hour < SEND_UNTIL_HOUR && !isRestDay(date);
+}
+
+let anyHourColumnReady = false;
+async function ensureAnyHourColumn() {
+  if (anyHourColumnReady) return;
+  await pool.query('ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_any_hour BOOLEAN NOT NULL DEFAULT false');
+  anyHourColumnReady = true;
+}
+
+export async function sendsAnyHour(tenantId) {
+  await ensureAnyHourColumn();
+  const { rows } = await pool.query('SELECT whatsapp_any_hour FROM tenants WHERE id = $1', [tenantId]);
+  return !!rows[0]?.whatsapp_any_hour;
+}
+
+export async function setSendsAnyHour(tenantId, on) {
+  await ensureAnyHourColumn();
+  await pool.query('UPDATE tenants SET whatsapp_any_hour = $1 WHERE id = $2', [!!on, tenantId]);
+}
+
+// The ids of the businesses that send at any hour.
+export async function anyHourTenantIds() {
+  await ensureAnyHourColumn();
+  const { rows } = await pool.query('SELECT id FROM tenants WHERE whatsapp_any_hour');
+  return rows.map((r) => r.id);
+}
+
+// May this business's WhatsApp go out now? Always, for one that sends at any hour.
+export async function inSendWindowFor(tenantId, date = new Date()) {
+  return inSendWindow(date) || (await sendsAnyHour(tenantId));
 }
 
 // The first hourly cron run inside the window (now, when inside it).

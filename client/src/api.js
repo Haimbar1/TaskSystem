@@ -106,6 +106,8 @@ export const api = {
   getOverdueCheck: () => request('/api/tenants/overdue-check'),
   setOverdueCheckHour: (hour) =>
     request('/api/tenants/overdue-check', { method: 'PUT', body: JSON.stringify({ hour }) }),
+  setWhatsAppAnyHour: (anyHour) =>
+    request('/api/tenants/overdue-check', { method: 'PUT', body: JSON.stringify({ any_hour: anyHour }) }),
   runOverdueCheck: () => request('/api/tenants/overdue-check/run', { method: 'POST' }),
   getWhatsAppTemplates: () => request('/api/tenants/whatsapp-templates'),
   updateWhatsAppTemplates: (settings) =>

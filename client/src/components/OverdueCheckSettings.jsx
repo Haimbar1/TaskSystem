@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 
-// The send window (server/src/services/sendWindow.js): Sunday–Thursday, 08:00–17:00, not holidays.
+// The send window (server/src/services/sendWindow.js): Sunday–Thursday, 08:00–17:00, not holidays —
+// unless the business turned on "שליחת הודעות וואטסאפ בכל שעה": then messages go out any hour, any
+// day, and the overdue check runs Sunday–Thursday (holidays too) — still at its hour, 08:00–16:00.
 const HOURS = Array.from({ length: 9 }, (_, i) => 8 + i); // 08:00–16:00
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
 
-// The overdue check's hour and "בדוק עכשיו" (server/src/services/overdueCheck.js). Business admins
+// "שליחת הודעות וואטסאפ בכל שעה", the overdue check's hour and "בדוק עכשיו" (server/src/services/overdueCheck.js). Business admins
 // (and the shared Monday login, standing in for them) change them; others see the hour only.
 export default function OverdueCheckSettings() {
   const { user } = useAppContext();
@@ -30,13 +32,23 @@ export default function OverdueCheckSettings() {
     }
   }
 
+  async function changeAnyHour(on) {
+    setMessage('');
+    try {
+      setSettings(await api.setWhatsAppAnyHour(on));
+      setMessage('נשמר');
+    } catch (err) {
+      setMessage(err.message?.startsWith('API error') ? 'שגיאה בשמירה' : err.message || 'שגיאה בשמירה');
+    }
+  }
+
   async function runNow() {
     setRunning(true);
     setMessage('');
     setResult(null);
     try {
       const r = await api.runOverdueCheck();
-      setSettings({ hour: r.hour, last_checked_on: r.last_checked_on });
+      setSettings({ hour: r.hour, any_hour: r.any_hour, last_checked_on: r.last_checked_on });
       setResult(r);
     } catch (err) {
       setMessage(err.message?.startsWith('API error') ? 'הבדיקה נכשלה' : err.message || 'הבדיקה נכשלה');
@@ -48,6 +60,20 @@ export default function OverdueCheckSettings() {
   if (!settings) return null;
   return (
     <div className="border rounded-lg p-3 bg-gray-50 space-y-2">
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={!!settings.any_hour}
+          disabled={!canEdit}
+          onChange={(e) => changeAnyHour(e.target.checked)}
+        />
+        <span className="font-medium">שליחת הודעות וואטסאפ בכל שעה</span>
+      </label>
+      <p className="text-xs text-gray-500">
+        {settings.any_hour
+          ? 'ההודעות יוצאות מיד, בכל שעה ובכל יום — גם בלילה, בשישי, בשבת ובחגים.'
+          : 'כבוי: הודעות וואטסאפ יוצאות רק בימים א׳–ה׳ בין 08:00 ל-17:00 (לא בשישי, בשבת ובחגים). הודעה שנוצרת מחוץ לשעות האלה ממתינה ויוצאת בשעת השליחה הקרובה.'}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">שעת הבדיקה היומית של משימות באיחור:</span>
         {canEdit ? (
@@ -78,9 +104,11 @@ export default function OverdueCheckSettings() {
         {message && <span className="text-gray-600">{message}</span>}
       </div>
       <p className="text-xs text-gray-500">
-        שעון ישראל. ההודעה יכולה לצאת עד שעה אחרי השעה שנבחרה. הודעות וואטסאפ יוצאות רק בימים א׳–ה׳ בין 08:00 ל-17:00 —
-        לא בשישי, בשבת ובחגים; הבדיקה רצה ביום העבודה הבא בשעה שנבחרה. "בדוק עכשיו" מריץ את הבדיקה מיד — מי שכבר קיבל היום
-        תזכורת על אותה משימה לא יקבל שוב.
+        שעון ישראל. ההודעה יכולה לצאת עד שעה אחרי השעה שנבחרה.
+        {settings.any_hour
+          ? ' הבדיקה רצה בימים א׳–ה׳ בשעה שנבחרה (לא בכל שעה), גם בחגים — לא בשישי ובשבת.'
+          : ' הודעות וואטסאפ יוצאות רק בימים א׳–ה׳ בין 08:00 ל-17:00 — לא בשישי, בשבת ובחגים; הבדיקה רצה ביום העבודה הבא בשעה שנבחרה.'}
+        {' '}"בדוק עכשיו" מריץ את הבדיקה מיד — מי שכבר קיבל היום תזכורת על אותה משימה לא יקבל שוב.
         {settings.last_checked_on && ` נבדק לאחרונה: ${settings.last_checked_on.split('-').reverse().join('/')}.`}
       </p>
       {result && (

@@ -3,9 +3,9 @@ import { api } from '../api.js';
 import { useAppContext } from '../context/AppContext.jsx';
 
 // The send window (server/src/services/sendWindow.js): Sunday–Thursday, 08:00–17:00, not holidays —
-// unless the business turned on "שליחת הודעות וואטסאפ בכל שעה": then any hour, any day.
-const WINDOW_HOURS = Array.from({ length: 9 }, (_, i) => 8 + i); // 08:00–16:00
-const ALL_HOURS = Array.from({ length: 24 }, (_, i) => i); // 00:00–23:00
+// unless the business turned on "שליחת הודעות וואטסאפ בכל שעה": then messages go out any hour, any
+// day, and the overdue check runs Sunday–Thursday (holidays too) — still at its hour, 08:00–16:00.
+const HOURS = Array.from({ length: 9 }, (_, i) => 8 + i); // 08:00–16:00
 const hourLabel = (h) => `${String(h).padStart(2, '0')}:00`;
 
 // "שליחת הודעות וואטסאפ בכל שעה", the overdue check's hour and "בדוק עכשיו" (server/src/services/overdueCheck.js). Business admins
@@ -58,7 +58,6 @@ export default function OverdueCheckSettings() {
   }
 
   if (!settings) return null;
-  const hours = settings.any_hour ? ALL_HOURS : WINDOW_HOURS;
   return (
     <div className="border rounded-lg p-3 bg-gray-50 space-y-2">
       <label className="flex items-center gap-2">
@@ -83,7 +82,7 @@ export default function OverdueCheckSettings() {
             value={settings.hour}
             onChange={(e) => changeHour(Number(e.target.value))}
           >
-            {hours.map((h) => (
+            {HOURS.map((h) => (
               <option key={h} value={h}>
                 {hourLabel(h)}
               </option>
@@ -107,7 +106,7 @@ export default function OverdueCheckSettings() {
       <p className="text-xs text-gray-500">
         שעון ישראל. ההודעה יכולה לצאת עד שעה אחרי השעה שנבחרה.
         {settings.any_hour
-          ? ' הבדיקה רצה כל יום בשעה שנבחרה, גם בשישי, בשבת ובחגים.'
+          ? ' הבדיקה רצה בימים א׳–ה׳ בשעה שנבחרה (לא בכל שעה), גם בחגים — לא בשישי ובשבת.'
           : ' הודעות וואטסאפ יוצאות רק בימים א׳–ה׳ בין 08:00 ל-17:00 — לא בשישי, בשבת ובחגים; הבדיקה רצה ביום העבודה הבא בשעה שנבחרה.'}
         {' '}"בדוק עכשיו" מריץ את הבדיקה מיד — מי שכבר קיבל היום תזכורת על אותה משימה לא יקבל שוב.
         {settings.last_checked_on && ` נבדק לאחרונה: ${settings.last_checked_on.split('-').reverse().join('/')}.`}

@@ -32,6 +32,11 @@ function isIndependenceDay(day, weekday) {
   return false;
 }
 
+// Friday or Saturday in Israel — the overdue check of a business that sends at any hour skips them.
+export function isWeekend(date = new Date()) {
+  return ['Fri', 'Sat'].includes(partsOf(date, { weekday: 'short' }).weekday);
+}
+
 export function isRestDay(date = new Date()) {
   const { weekday, day, month } = partsOf(date, { weekday: 'short', day: 'numeric', month: 'long' });
   if (weekday === 'Fri' || weekday === 'Sat') return true;

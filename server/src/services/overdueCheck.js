@@ -1,7 +1,17 @@
 import { pool } from '../db.js';
 import { sendWhatsAppMessage } from './whatsapp.js';
 import { ensureStatusSchema, DEFAULT_STATUSES } from './taskStatuses.js';
-import { SEND_FROM_HOUR, SEND_UNTIL_HOUR, inSendWindow, nextSendTime, formatSendTime } from './sendWindow.js';
+import {
+  SEND_FROM_HOUR,
+  SEND_UNTIL_HOUR,
+  inSendWindow,
+  inSendWindowFor,
+  sendsAnyHour,
+  setSendsAnyHour,
+  anyHourTenantIds,
+  nextSendTime,
+  formatSendTime,
+} from './sendWindow.js';
 
 // The overdue check: a WhatsApp reminder to the assignees of every task whose due date has passed.
 // Each business picks the hour (Israel time, default 08:00 — tenants.overdue_check_hour) on the
@@ -13,10 +23,12 @@ import { SEND_FROM_HOUR, SEND_UNTIL_HOUR, inSendWindow, nextSendTime, formatSend
 // the check doesn't run at all — not even "בדוק עכשיו" — so nothing piles up: the first workday's
 // check at the business's hour covers every task still overdue. A run missed earlier in the day
 // catches up on the next hourly run, but not after 17:00. So the hour a business picks is 08:00–16:00.
+// A business that sends at any hour ("שליחת הודעות וואטסאפ בכל שעה", tenants.whatsapp_any_hour) has
+// no window: its check runs every day, holidays too, at any hour it picks (00:00–23:00).
 
 export const DEFAULT_CHECK_HOUR = 8;
 const LAST_CHECK_HOUR = SEND_UNTIL_HOUR - 1;
-const clampHour = (h) => Math.min(Math.max(h, SEND_FROM_HOUR), LAST_CHECK_HOUR);
+const clampHour = (h, anyHour) => (anyHour ? h : Math.min(Math.max(h, SEND_FROM_HOUR), LAST_CHECK_HOUR));
 const TZ = 'Asia/Jerusalem';
 // today in Israel, and the moment it started
 const LOCAL_DATE = `(now() AT TIME ZONE '${TZ}')::date`;
@@ -37,17 +49,26 @@ export async function getCheckSettings(tenantId) {
   const { rows } = await pool.query('SELECT overdue_check_hour, overdue_checked_on FROM tenants WHERE id = $1', [
     tenantId,
   ]);
+  const anyHour = await sendsAnyHour(tenantId);
   return {
-    hour: clampHour(rows[0]?.overdue_check_hour ?? DEFAULT_CHECK_HOUR),
+    hour: clampHour(rows[0]?.overdue_check_hour ?? DEFAULT_CHECK_HOUR, anyHour),
+    any_hour: anyHour,
     last_checked_on: rows[0]?.overdue_checked_on || null,
   };
 }
 
-// Returns an error message for an hour outside the send window (08:00–16:00).
-export async function setCheckHour(tenantId, hour) {
+// Saves "שליחת הודעות וואטסאפ בכל שעה" (anyHour, when given) and the check's hour (when given).
+// Returns an error message for an hour outside the send window (08:00–16:00), unless the business
+// sends at any hour (00:00–23:00). Turning any-hour off keeps an hour outside the window, read as
+// the nearest hour inside it.
+export async function setCheckSettings(tenantId, { hour, anyHour } = {}) {
+  if (anyHour !== undefined) await setSendsAnyHour(tenantId, anyHour);
+  if (hour === undefined || hour === null) return null;
   const h = Number(hour);
-  if (!Number.isInteger(h) || h < SEND_FROM_HOUR || h > LAST_CHECK_HOUR) {
-    return `אפשר לבחור שעה בין ${SEND_FROM_HOUR}:00 ל-${LAST_CHECK_HOUR}:00`;
+  const open = await sendsAnyHour(tenantId);
+  const [from, to] = open ? [0, 23] : [SEND_FROM_HOUR, LAST_CHECK_HOUR];
+  if (!Number.isInteger(h) || h < from || h > to) {
+    return `אפשר לבחור שעה בין ${String(from).padStart(2, '0')}:00 ל-${to}:00`;
   }
   await ensureColumns();
   await pool.query('UPDATE tenants SET overdue_check_hour = $1 WHERE id = $2', [h, tenantId]);
@@ -60,7 +81,7 @@ export async function setCheckHour(tenantId, hour) {
 // once a day per task: a second run the same day skips them (counted in alreadySent).
 // Outside the send window nothing is checked or sent: { outsideWindow: true, nextSendAt }.
 export async function runOverdueCheck(tenantId) {
-  if (!inSendWindow()) {
+  if (!(await inSendWindowFor(tenantId))) {
     return { outsideWindow: true, nextSendAt: formatSendTime(nextSendTime()), checked: 0, alreadySent: 0, whatsappMessages: [] };
   }
   await ensureColumns();
@@ -113,18 +134,23 @@ export async function runOverdueCheck(tenantId) {
 }
 
 // The hourly cron: every business whose hour has come (Israel time) and that wasn't checked today,
-// only inside the send window. Claimed by marking it checked first, so overlapping runs don't both
-// send. An hour saved before the window existed counts as the nearest hour inside it.
+// only inside the send window — outside it, only businesses that send at any hour. Claimed by
+// marking it checked first, so overlapping runs don't both send. An hour outside the window (saved
+// before it existed, or while the business sent at any hour) counts as the nearest hour inside it,
+// unless the business sends at any hour.
 export async function runScheduledChecks() {
-  if (!inSendWindow()) return [];
+  const open = inSendWindow();
+  if (!open && !(await anyHourTenantIds()).length) return [];
   await ensureColumns();
   const { rows } = await pool.query(
     `UPDATE tenants SET overdue_checked_on = ${LOCAL_DATE}
      WHERE (overdue_checked_on IS NULL OR overdue_checked_on < ${LOCAL_DATE})
+       AND ($4 OR whatsapp_any_hour)
        AND EXTRACT(HOUR FROM now() AT TIME ZONE '${TZ}')
-           >= LEAST(GREATEST(COALESCE(overdue_check_hour, $1), $2), $3)
+           >= CASE WHEN whatsapp_any_hour THEN COALESCE(overdue_check_hour, $1)
+                   ELSE LEAST(GREATEST(COALESCE(overdue_check_hour, $1), $2), $3) END
      RETURNING id`,
-    [DEFAULT_CHECK_HOUR, SEND_FROM_HOUR, LAST_CHECK_HOUR]
+    [DEFAULT_CHECK_HOUR, SEND_FROM_HOUR, LAST_CHECK_HOUR, open]
   );
   const results = [];
   for (const { id } of rows) {

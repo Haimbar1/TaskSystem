@@ -5,7 +5,7 @@ import { formatDate } from '../dateFormat.js';
 import { whatsappCredentials } from '../tenantSecrets.js';
 import { recordMessage } from './whatsappLog.js';
 import { taskLinkFor } from '../routes/openTaskRoutes.js';
-import { inSendWindow, nextSendTime, formatSendTime } from './sendWindow.js';
+import { inSendWindow, inSendWindowFor, anyHourTenantIds, nextSendTime, formatSendTime } from './sendWindow.js';
 
 const GRAPH_API_URL = 'https://graph.facebook.com/v20.0';
 
@@ -159,7 +159,8 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
   }
 
   // Outside the send window (sendWindow.js): held, not sent — flushQueue sends it at the first slot.
-  if (!inSendWindow()) {
+  // A business that sends at any hour has no window.
+  if (!(await inSendWindowFor(tenantId))) {
     await queueMessage({ tenantId, userId, eventType, taskId: task.id, extra });
     return {
       to: toWhatsAppNumber(recipient.phone),
@@ -305,12 +306,17 @@ async function queueMessage({ tenantId, userId, eventType, taskId, extra = {} })
   ]);
 }
 
-// Run by the hourly cron (routes/cronRoutes.js): inside the send window, sends every held message.
+// Run by the hourly cron (routes/cronRoutes.js): inside the send window, sends every held message;
+// outside it, only those of businesses that send at any hour (held before they turned it on).
 // The rows leave the queue before they're sent, so overlapping runs don't both send one.
 export async function flushQueue() {
-  if (!inSendWindow()) return { sent: 0, failed: 0 };
+  const all = inSendWindow();
+  const anyHour = all ? [] : await anyHourTenantIds();
+  if (!all && !anyHour.length) return { sent: 0, failed: 0 };
   await ensureQueue();
-  const { rows } = await pool.query('DELETE FROM whatsapp_queue RETURNING *');
+  const { rows } = all
+    ? await pool.query('DELETE FROM whatsapp_queue RETURNING *')
+    : await pool.query('DELETE FROM whatsapp_queue WHERE tenant_id = ANY($1) RETURNING *', [anyHour]);
   let sent = 0;
   let failed = 0;
   for (const row of rows.sort((a, b) => a.created_at - b.created_at)) {

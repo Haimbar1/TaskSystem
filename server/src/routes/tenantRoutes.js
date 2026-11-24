@@ -21,7 +21,7 @@ import {
 import { getStatuses, setStatuses, STATUS_COLORS, DEFAULT_STATUSES } from '../services/taskStatuses.js';
 import { recordAction, listActions } from '../services/auditLog.js';
 import { defaultMessageLink, getMessageLinkSetting, setMessageLinkSetting } from '../services/messageLink.js';
-import { getCheckSettings, setCheckHour, runOverdueCheck } from '../services/overdueCheck.js';
+import { getCheckSettings, setCheckSettings, runOverdueCheck } from '../services/overdueCheck.js';
 
 const router = Router();
 
@@ -174,13 +174,17 @@ router.get('/overdue-check', requireAuth, requireTenant, requireTenantAdmin, asy
   res.json(await getCheckSettings(req.tenantId));
 });
 
+// Body: { hour } and/or { any_hour } ("שליחת הודעות וואטסאפ בכל שעה", services/sendWindow.js).
 router.put('/overdue-check', requireAuth, requireTenant, requireTenantAdmin, async (req, res) => {
-  const error = await setCheckHour(req.tenantId, req.body?.hour);
+  const { hour, any_hour } = req.body || {};
+  const anyHour = typeof any_hour === 'boolean' ? any_hour : undefined;
+  const error = await setCheckSettings(req.tenantId, { hour, anyHour });
   if (error) return res.status(400).json({ error });
-  await recordAction(req, {
-    action: 'settings_changed',
-    details: `שעת בדיקת משימות באיחור: ${String(req.body.hour).padStart(2, '0')}:00`,
-  });
+  const details = [
+    anyHour !== undefined && `שליחת הודעות וואטסאפ בכל שעה: ${anyHour ? 'פעיל' : 'כבוי'}`,
+    hour !== undefined && hour !== null && `שעת בדיקת משימות באיחור: ${String(hour).padStart(2, '0')}:00`,
+  ].filter(Boolean);
+  if (details.length) await recordAction(req, { action: 'settings_changed', details: details.join(' · ') });
   res.json(await getCheckSettings(req.tenantId));
 });
 

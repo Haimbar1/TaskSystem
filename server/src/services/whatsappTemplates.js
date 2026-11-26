@@ -141,11 +141,15 @@ export async function templateFor(tenantId, eventType) {
   return {
     name: t.name,
     language: t.language || 'he',
-    // A link always gets a space before it: a template written "קישור למשימה{{4}}" (task_overdue in
+    // Every value is trimmed: one ending in a space (e.g. a title typed as "בדיקות. ") breaks
+    // WhatsApp's *bold* around it in the template, since "*text *" isn't bold.
+    // Then a link gets a space before it: a template written "קישור למשימה{{4}}" (task_overdue in
     // Meta is) glues it to the word, and WhatsApp on phones then links only part of the address.
+    // The space is added after the trim, so nothing may trim the values again (it once did, in
+    // whatsapp.js, and the links broke on phones again — Haim, 2026-11-26).
     buildParams: (ctx) =>
       t.params.map((key) => {
-        const value = String(TEMPLATE_FIELDS[key]?.value(ctx) ?? '') || '—';
+        const value = String(TEMPLATE_FIELDS[key]?.value(ctx) ?? '').trim() || '—';
         return key === 'link' && value !== '—' ? ` ${value}` : value;
       }),
     // for the outgoing log; a template saved without its text logs its name and values

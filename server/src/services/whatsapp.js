@@ -176,8 +176,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
 
   // Opens this task: a 2-day signed link for a business that works through Monday, else a plain one.
   const link = await taskLinkFor({ tenantId, taskId: task.id, userId });
-  // Trimmed: a value ending in a space (e.g. a title typed as "בדיקות. ") breaks WhatsApp's *bold*
-  // around it in the template, since "*text *" isn't bold.
+  // buildParams trims the values and puts a space before the link — don't trim them again here.
   const params = template.buildParams({
     recipientName: recipient.name || '',
     task,
@@ -185,7 +184,7 @@ export async function sendWhatsAppMessage({ tenantId, userId, eventType, task, e
     statusLabel: statusLabel(await getStatuses(tenantId), task.status),
     link,
     ...extra,
-  }).map((value) => String(value ?? '').trim());
+  });
 
   const message = {
     to: toWhatsAppNumber(recipient.phone),
